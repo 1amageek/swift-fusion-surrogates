@@ -8,7 +8,7 @@ extension QLKNN {
 
     /// Predict transport fluxes using MLXArray inputs
     ///
-    /// - Parameter inputs: Dictionary of input parameters as MLXArrays
+    /// - Parameter inputs: Dictionary of input parameters as MLXArrays (1D arrays of length batch_size)
     /// - Returns: Dictionary of output parameters as MLXArrays
     /// - Throws: FusionSurrogatesError if prediction fails
     public func predict(_ inputs: [String: MLXArray]) throws -> [String: MLXArray] {
@@ -18,11 +18,11 @@ extension QLKNN {
         // Validate shapes are consistent
         try QLKNN.validateShapes(inputs)
 
-        // Convert MLXArrays to Python numpy arrays
-        let pythonInputs = MLXConversion.batchToPython(inputs)
+        // Convert MLXArrays to 2D numpy array (batch_size, 10)
+        let pythonInputArray = MLXConversion.batchToPythonArray(inputs)
 
-        // Call Python prediction
-        let pythonOutputs = model.predict(pythonInputs)
+        // Call Python prediction (new API returns dict of JAX arrays)
+        let pythonOutputs = model.predict(pythonInputArray)
 
         // Convert outputs back to MLXArrays
         return MLXConversion.batchFromPython(pythonOutputs)
@@ -65,27 +65,31 @@ extension QLKNN {
 
 extension QLKNN {
 
-    /// Input parameter names expected by QLKNN model
+    /// Input parameter names expected by QLKNN model (new API)
+    /// Order matters: must match model.config.input_names
     public static let inputParameterNames: [String] = [
-        "R_L_Te",      // Normalized electron temperature gradient
-        "R_L_Ti",      // Normalized ion temperature gradient
-        "R_L_ne",      // Normalized electron density gradient
-        "R_L_ni",      // Normalized ion density gradient
-        "q",           // Safety factor
-        "s_hat",       // Magnetic shear
-        "r_R",         // Local inverse aspect ratio
-        "Ti_Te",       // Ion-electron temperature ratio
-        "log_nu_star", // Logarithmic normalized collisionality
-        "ni_ne"        // Normalized density ratio
+        "Ati",        // R/L_Ti - Normalized ion temperature gradient
+        "Ate",        // R/L_Te - Normalized electron temperature gradient
+        "Ane",        // R/L_ne - Normalized electron density gradient
+        "Ani",        // R/L_ni - Normalized ion density gradient
+        "q",          // Safety factor
+        "smag",       // Magnetic shear (s_hat)
+        "x",          // r/R - Inverse aspect ratio
+        "Ti_Te",      // Ion-electron temperature ratio
+        "LogNuStar",  // Logarithmic normalized collisionality
+        "normni"      // Normalized ion density (ni/ne)
     ]
 
-    /// Output parameter names returned by QLKNN model
+    /// Output parameter names returned by QLKNN model (new API)
     public static let outputParameterNames: [String] = [
-        "chi_ion_itg",      // Ion heat flux from ITG
-        "chi_electron_tem", // Electron heat flux from TEM
-        "chi_electron_etg", // Electron heat flux from ETG
-        "particle_flux",    // Particle flux
-        "growth_rate"       // Maximum growth rate
+        "efiITG",     // Ion thermal flux (ITG mode) [GB units]
+        "efeITG",     // Electron thermal flux (ITG mode)
+        "efeTEM",     // Electron thermal flux (TEM mode)
+        "efeETG",     // Electron thermal flux (ETG mode)
+        "efiTEM",     // Ion thermal flux (TEM mode)
+        "pfeITG",     // Particle flux (ITG mode)
+        "pfeTEM",     // Particle flux (TEM mode)
+        "gamma_max"   // Maximum growth rate
     ]
 
     /// Validate input dictionary has all required parameters

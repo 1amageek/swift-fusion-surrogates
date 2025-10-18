@@ -28,34 +28,38 @@ public class QLKNN {
 
     internal let model: PythonObject
 
-    /// Initialize the QLKNN model
-    /// - Parameter modelVersion: The QLKNN model version (default: "7_11")
-    public init(modelVersion: String = "7_11") throws {
+    /// Initialize the QLKNN model using the new QLKNNModel API
+    /// - Parameter modelName: The QLKNN model name (default: "qlknn_7_11_v1")
+    public init(modelName: String = "qlknn_7_11_v1") throws {
         let fusionSurrogates = Python.import("fusion_surrogates")
-        let qlknn = fusionSurrogates.qlknn
+        let qlknnModule = fusionSurrogates.qlknn.qlknn_model
+        let QLKNNModel = qlknnModule.QLKNNModel
 
-        // Initialize the model based on version
-        if modelVersion == "7_11" {
-            self.model = qlknn.QLKNN_7_11()
+        // Load model using the new API
+        if modelName == "qlknn_7_11_v1" || modelName == "default" {
+            self.model = QLKNNModel.load_default_model()
         } else {
-            throw FusionSurrogatesError.unsupportedModelVersion(modelVersion)
+            self.model = QLKNNModel.load_model_from_name(modelName)
         }
     }
 
-    /// Predict transport fluxes with PythonObject inputs (low-level)
+    /// Predict transport fluxes with numpy array input (low-level)
     /// - Parameters:
-    ///   - inputs: Dictionary of input parameters as PythonObjects
-    /// - Returns: Dictionary of predicted outputs as PythonObject
-    public func predictPython(_ inputs: [String: PythonObject]) -> PythonObject {
+    ///   - inputs: 2D numpy array of shape (batch_size, 10) with features in order:
+    ///             [Ati, Ate, Ane, Ani, q, smag, x, Ti_Te, LogNuStar, normni]
+    /// - Returns: Dictionary of predicted flux outputs (JAX arrays)
+    public func predictPython(_ inputs: PythonObject) -> PythonObject {
         return model.predict(inputs)
     }
 
-    /// Predict transport fluxes with Double values (returns PythonObject)
-    /// - Parameters:
-    ///   - inputs: Dictionary of input parameters with Double values
-    /// - Returns: Dictionary of predicted outputs as PythonObject
-    public func predictPython(_ inputs: [String: Double]) -> PythonObject {
-        return model.predict(inputs)
+    /// Get model configuration
+    public var config: PythonObject {
+        return model.config
+    }
+
+    /// Get model metadata
+    public var metadata: PythonObject {
+        return model._metadata
     }
 
     /// Access to the raw Python model

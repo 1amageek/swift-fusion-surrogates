@@ -104,28 +104,45 @@ public enum TORAXIntegration {
 
     /// Combine QLKNN flux predictions into total transport coefficients
     ///
-    /// QLKNN outputs separate contributions from ITG, TEM, and ETG modes.
-    /// This combines them into total chi_ion and chi_electron.
+    /// New QLKNN API outputs separate contributions from ITG, TEM, and ETG modes:
+    /// - efiITG, efeITG: Ion/electron thermal flux (ITG mode)
+    /// - efiTEM, efeTEM: Ion/electron thermal flux (TEM mode)
+    /// - efeETG: Electron thermal flux (ETG mode)
+    /// - pfeITG, pfeTEM: Particle flux (ITG/TEM modes)
+    /// - gamma_max: Growth rate
     ///
-    /// - Parameter qlknnOutputs: Dictionary of QLKNN predictions
+    /// This combines them into total chi_ion and chi_electron for TORAX.
+    ///
+    /// - Parameter qlknnOutputs: Dictionary of QLKNN predictions (new API names)
     /// - Returns: Dictionary with combined transport coefficients
     public static func combineFluxes(_ qlknnOutputs: [String: MLXArray]) -> [String: MLXArray] {
         var combined: [String: MLXArray] = [:]
 
-        // Total ion heat diffusivity (primarily from ITG)
-        combined["chi_ion"] = qlknnOutputs["chi_ion_itg"] ?? MLXArray.zeros([1])
+        // Total ion heat diffusivity (ITG + TEM modes)
+        let efiITG = qlknnOutputs["efiITG"] ?? MLXArray.zeros([1])
+        let efiTEM = qlknnOutputs["efiTEM"] ?? MLXArray.zeros([1])
+        combined["chi_ion"] = efiITG + efiTEM
 
-        // Total electron heat diffusivity (TEM + ETG)
-        let chiTEM = qlknnOutputs["chi_electron_tem"] ?? MLXArray.zeros([1])
-        let chiETG = qlknnOutputs["chi_electron_etg"] ?? MLXArray.zeros([1])
-        combined["chi_electron"] = chiTEM + chiETG
+        // Total electron heat diffusivity (ITG + TEM + ETG modes)
+        let efeITG = qlknnOutputs["efeITG"] ?? MLXArray.zeros([1])
+        let efeTEM = qlknnOutputs["efeTEM"] ?? MLXArray.zeros([1])
+        let efeETG = qlknnOutputs["efeETG"] ?? MLXArray.zeros([1])
+        combined["chi_electron"] = efeITG + efeTEM + efeETG
 
-        // Particle diffusivity (can be derived from particle flux)
-        combined["particle_diffusivity"] = qlknnOutputs["particle_flux"] ?? MLXArray.zeros([1])
+        // Total particle flux (ITG + TEM modes)
+        let pfeITG = qlknnOutputs["pfeITG"] ?? MLXArray.zeros([1])
+        let pfeTEM = qlknnOutputs["pfeTEM"] ?? MLXArray.zeros([1])
+        combined["particle_flux"] = pfeITG + pfeTEM
+
+        // Particle diffusivity (same as particle flux in GyroBohm units)
+        combined["particle_diffusivity"] = combined["particle_flux"]!
 
         // Convection velocity (assume zero for now)
         let nCells = (qlknnOutputs.values.first?.shape[0]) ?? 1
         combined["convection_velocity"] = MLXArray.zeros([nCells])
+
+        // Growth rate
+        combined["growth_rate"] = qlknnOutputs["gamma_max"] ?? MLXArray.zeros([nCells])
 
         return combined
     }
@@ -265,17 +282,18 @@ extension QLKNN {
         )
         let niNe = ionDensity / electronDensity
 
+        // Note: Ati = R/L_Ti, Ate = R/L_Te (ion first, electron second)
         return [
-            "R_L_Te": rLnTe,
-            "R_L_Ti": rLnTi,
-            "R_L_ne": rLnNe,
-            "R_L_ni": rLnNi,
-            "q": q,
-            "s_hat": sHat,
-            "r_R": rR,
-            "Ti_Te": tiTe,
-            "log_nu_star": logNuStar,
-            "ni_ne": niNe
+            "Ati": rLnTi,       // R/L_Ti (ion temperature gradient)
+            "Ate": rLnTe,       // R/L_Te (electron temperature gradient)
+            "Ane": rLnNe,       // R/L_ne (electron density gradient)
+            "Ani": rLnNi,       // R/L_ni (ion density gradient)
+            "q": q,             // Safety factor
+            "smag": sHat,       // Magnetic shear (was s_hat)
+            "x": rR,            // r/R (inverse aspect ratio, was r_R)
+            "Ti_Te": tiTe,      // Temperature ratio
+            "LogNuStar": logNuStar,  // Collisionality (was log_nu_star)
+            "normni": niNe      // Normalized density (was ni_ne)
         ]
     }
 }

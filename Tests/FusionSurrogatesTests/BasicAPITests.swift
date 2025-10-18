@@ -5,30 +5,34 @@ import Testing
 @Suite("Basic API Tests")
 struct BasicAPITests {
 
-    @Test("QLKNN input parameter names")
+    @Test("QLKNN input parameter names (new API)")
     func inputParameterNames() {
         let names = QLKNN.inputParameterNames
         #expect(names.count == 10)
-        #expect(names.contains("R_L_Te"))
-        #expect(names.contains("R_L_Ti"))
-        #expect(names.contains("R_L_ne"))
-        #expect(names.contains("R_L_ni"))
-        #expect(names.contains("q"))
-        #expect(names.contains("s_hat"))
-        #expect(names.contains("r_R"))
-        #expect(names.contains("Ti_Te"))
-        #expect(names.contains("log_nu_star"))
-        #expect(names.contains("ni_ne"))
+        #expect(names.contains("Ati"))        // R/L_Ti
+        #expect(names.contains("Ate"))        // R/L_Te
+        #expect(names.contains("Ane"))        // R/L_ne
+        #expect(names.contains("Ani"))        // R/L_ni
+        #expect(names.contains("q"))          // Safety factor
+        #expect(names.contains("smag"))       // Magnetic shear (was s_hat)
+        #expect(names.contains("x"))          // r/R (was r_R)
+        #expect(names.contains("Ti_Te"))      // Temperature ratio
+        #expect(names.contains("LogNuStar"))  // Collisionality (was log_nu_star)
+        #expect(names.contains("normni"))     // ni/ne (was ni_ne)
     }
 
-    @Test("QLKNN output parameter names")
+    @Test("QLKNN output parameter names (new API)")
     func outputParameterNames() {
         let names = QLKNN.outputParameterNames
-        #expect(names.count >= 4)
-        #expect(names.contains("chi_ion_itg"))
-        #expect(names.contains("chi_electron_tem"))
-        #expect(names.contains("chi_electron_etg"))
-        #expect(names.contains("particle_flux"))
+        #expect(names.count == 8)
+        #expect(names.contains("efiITG"))     // Ion thermal flux (ITG)
+        #expect(names.contains("efeITG"))     // Electron thermal flux (ITG)
+        #expect(names.contains("efeTEM"))     // Electron thermal flux (TEM)
+        #expect(names.contains("efeETG"))     // Electron thermal flux (ETG)
+        #expect(names.contains("efiTEM"))     // Ion thermal flux (TEM)
+        #expect(names.contains("pfeITG"))     // Particle flux (ITG)
+        #expect(names.contains("pfeTEM"))     // Particle flux (TEM)
+        #expect(names.contains("gamma_max"))  // Growth rate
     }
 
     @Test("FusionSurrogatesError descriptions")

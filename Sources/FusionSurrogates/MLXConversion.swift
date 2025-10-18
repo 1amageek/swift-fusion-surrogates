@@ -52,7 +52,53 @@ public enum MLXConversion {
         return MLXArray(data, shape)
     }
 
-    /// Batch convert multiple MLXArrays to Python numpy arrays
+    /// Convert dictionary of MLXArrays to 2D numpy array for QLKNNModel
+    ///
+    /// New QLKNN API requires 2D array (batch_size, num_features) instead of dict
+    /// Features must be in order: [Ati, Ate, Ane, Ani, q, smag, x, Ti_Te, LogNuStar, normni]
+    ///
+    /// - Parameter arrays: Dictionary of MLXArrays (each with shape [batch_size])
+    /// - Returns: 2D numpy array of shape (batch_size, 10)
+    public static func batchToPythonArray(_ arrays: [String: MLXArray]) -> PythonObject {
+        let np = Python.import("numpy")
+
+        // Feature order as defined by QLKNN.inputParameterNames
+        let featureNames = [
+            "Ati", "Ate", "Ane", "Ani", "q", "smag", "x", "Ti_Te", "LogNuStar", "normni"
+        ]
+
+        // Get batch size from first array
+        guard let firstArray = arrays.values.first else {
+            // Return empty 2D array
+            return np.array([[Float]]())
+        }
+        let batchSize = firstArray.shape[0]
+
+        // Stack features in correct order
+        var features: [[Float]] = []
+        for fname in featureNames {
+            guard let array = arrays[fname] else {
+                // Missing feature - this should have been caught by validation
+                continue
+            }
+            eval(array)
+            let values = array.asArray(Float.self)
+            features.append(values)
+        }
+
+        // Transpose: features is [num_features][batch_size], need [batch_size][num_features]
+        var transposed: [[Float]] = Array(repeating: Array(repeating: 0.0, count: featureNames.count), count: batchSize)
+        for (featureIdx, featureValues) in features.enumerated() {
+            for (batchIdx, value) in featureValues.enumerated() {
+                transposed[batchIdx][featureIdx] = value
+            }
+        }
+
+        // Convert to numpy array
+        return np.array(transposed)
+    }
+
+    /// Batch convert multiple MLXArrays to Python numpy arrays (legacy dict format)
     ///
     /// - Parameter arrays: Dictionary of MLXArrays
     /// - Returns: Dictionary of Python numpy arrays
