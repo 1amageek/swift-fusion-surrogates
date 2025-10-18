@@ -1,0 +1,3 @@
+[submodule "fusion_surrogates"]
+	path = fusion_surrogates
+	url = https://github.com/google-deepmind/fusion_surrogates.git
