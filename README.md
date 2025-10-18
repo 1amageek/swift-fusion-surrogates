@@ -5,10 +5,13 @@ A Swift wrapper for Google DeepMind's [fusion_surrogates](https://github.com/goo
 [![Swift 6.0+](https://img.shields.io/badge/Swift-6.0+-orange.svg)](https://swift.org)
 [![Platform](https://img.shields.io/badge/platform-macOS%2013.3+-lightgrey.svg)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![API Version](https://img.shields.io/badge/API-2.0%20(QLKNNModel)-green.svg)](API_MIGRATION.md)
 
 ## Overview
 
 **FusionSurrogates** provides a Swift interface to neural network surrogate models for turbulent transport in fusion plasmas. It enables fast, GPU-accelerated transport coefficient predictions for tokamak simulations on Apple Silicon.
+
+**🆕 Version 2.0:** Updated to support the latest fusion_surrogates API (`QLKNNModel`). See [API_MIGRATION.md](API_MIGRATION.md) for details.
 
 ### What is TORAX?
 
@@ -78,29 +81,35 @@ dependencies: [
 import FusionSurrogates
 import MLX
 
-// Initialize QLKNN model
-let qlknn = try QLKNN(modelVersion: "7_11")
+// Initialize QLKNN model (new API)
+let qlknn = try QLKNN(modelName: "qlknn_7_11_v1")
 
 // Prepare inputs (normalized gradients, safety factor, etc.)
 let inputs: [String: MLXArray] = [
-    "R_L_Te": MLXArray([5.0, 5.5, 6.0], [3]),    // Electron temp gradient
-    "R_L_Ti": MLXArray([5.0, 5.5, 6.0], [3]),    // Ion temp gradient
-    "R_L_ne": MLXArray([1.0, 1.2, 1.4], [3]),    // Density gradient
-    "R_L_ni": MLXArray([1.0, 1.2, 1.4], [3]),    // Ion density gradient
-    "q": MLXArray([2.0, 2.5, 3.0], [3]),         // Safety factor
-    "s_hat": MLXArray([1.0, 1.2, 1.4], [3]),     // Magnetic shear
-    "r_R": MLXArray([0.3, 0.35, 0.4], [3]),      // Inverse aspect ratio
-    "Ti_Te": MLXArray([1.0, 1.0, 1.0], [3]),     // Temperature ratio
-    "log_nu_star": MLXArray([-10.0, -9.5, -9.0], [3]), // Collisionality
-    "ni_ne": MLXArray([1.0, 1.0, 1.0], [3])      // Density ratio
+    "Ati": MLXArray([5.0, 5.5, 6.0], [3]),        // Ion temp gradient (R/L_Ti)
+    "Ate": MLXArray([5.0, 5.5, 6.0], [3]),        // Electron temp gradient (R/L_Te)
+    "Ane": MLXArray([1.0, 1.2, 1.4], [3]),        // Electron density gradient
+    "Ani": MLXArray([1.0, 1.2, 1.4], [3]),        // Ion density gradient
+    "q": MLXArray([2.0, 2.5, 3.0], [3]),          // Safety factor
+    "smag": MLXArray([1.0, 1.2, 1.4], [3]),       // Magnetic shear
+    "x": MLXArray([0.3, 0.35, 0.4], [3]),         // Inverse aspect ratio (r/R)
+    "Ti_Te": MLXArray([1.0, 1.0, 1.0], [3]),      // Temperature ratio
+    "LogNuStar": MLXArray([-10.0, -9.5, -9.0], [3]), // Collisionality
+    "normni": MLXArray([1.0, 1.0, 1.0], [3])      // Density ratio (ni/ne)
 ]
 
 // Run prediction
 let outputs = try qlknn.predict(inputs)
 
-// Access transport coefficients
-let chiIon = outputs["chi_ion_itg"]!           // Ion heat diffusivity
-let chiElectron = outputs["chi_electron_tem"]! // Electron heat diffusivity
+// Access transport coefficients (new output names)
+let efiITG = outputs["efiITG"]!      // Ion heat flux (ITG mode)
+let efeTEM = outputs["efeTEM"]!      // Electron heat flux (TEM mode)
+let efeETG = outputs["efeETG"]!      // Electron heat flux (ETG mode)
+
+// Combine fluxes for TORAX
+let combined = TORAXIntegration.combineFluxes(outputs)
+let chiIon = combined["chi_ion"]!           // Total ion heat diffusivity
+let chiElectron = combined["chi_electron"]! // Total electron heat diffusivity
 ```
 
 ## Usage with swift-TORAX
@@ -122,7 +131,7 @@ public struct QLKNNTransportModel: TransportModel {
         minorRadius: Float,
         toroidalField: Float
     ) throws {
-        self.qlknn = try QLKNN(modelVersion: "7_11")
+        self.qlknn = try QLKNN(modelName: "qlknn_7_11_v1")
         self.majorRadius = majorRadius
         self.minorRadius = minorRadius
         self.toroidalField = toroidalField
@@ -195,30 +204,41 @@ See [`TORAX_INTEGRATION.md`](TORAX_INTEGRATION.md) for complete integration guid
 
 ## API Overview
 
-### QLKNN Input Parameters
+### QLKNN Input Parameters (New API v2.0)
 
 | Parameter | Description | Typical Range |
 |-----------|-------------|---------------|
-| `R_L_Te` | Normalized electron temperature gradient | 0-16 |
-| `R_L_Ti` | Normalized ion temperature gradient | 0-16 |
-| `R_L_ne` | Normalized electron density gradient | -5 to 5 |
-| `R_L_ni` | Normalized ion density gradient | -15 to 15 |
-| `q` | Safety factor | 0.66-10 |
-| `s_hat` | Magnetic shear | -1 to 4 |
-| `r_R` | Inverse aspect ratio | 0.1-0.95 |
+| `Ati` | R/L_Ti - Normalized ion temperature gradient | 0-150 |
+| `Ate` | R/L_Te - Normalized electron temperature gradient | 0-150 |
+| `Ane` | R/L_ne - Normalized electron density gradient | -5 to 110 |
+| `Ani` | R/L_ni - Normalized ion density gradient | -15 to 110 |
+| `q` | Safety factor | 0.66-30 |
+| `smag` | Magnetic shear (s_hat) | -1 to 40 |
+| `x` | r/R - Inverse aspect ratio | 0.1-0.95 |
 | `Ti_Te` | Ion-electron temperature ratio | 0.25-2.5 |
-| `log_nu_star` | Logarithmic collisionality | -5 to 0 |
-| `ni_ne` | Normalized density ratio | 0.7-1.0 |
+| `LogNuStar` | Logarithmic collisionality | -5 to 0.48 |
+| `normni` | ni/ne - Normalized density ratio | 0.5-1.0 |
 
-### QLKNN Output Parameters
+**Note:** Ranges are significantly expanded in the new QLKNN 7_11_v1 model compared to legacy versions.
 
-| Parameter | Description | Physics |
-|-----------|-------------|---------|
-| `chi_ion_itg` | Ion heat diffusivity (ITG) | m²/s |
-| `chi_electron_tem` | Electron heat diffusivity (TEM) | m²/s |
-| `chi_electron_etg` | Electron heat diffusivity (ETG) | m²/s |
-| `particle_flux` | Particle flux | 1/s |
-| `growth_rate` | Instability growth rate | 1/s |
+### QLKNN Output Parameters (New API v2.0)
+
+| Parameter | Description | Physics | Mode |
+|-----------|-------------|---------|------|
+| `efiITG` | Ion thermal flux | GB units | ITG |
+| `efeITG` | Electron thermal flux | GB units | ITG |
+| `efeTEM` | Electron thermal flux | GB units | TEM |
+| `efeETG` | Electron thermal flux | GB units | ETG |
+| `efiTEM` | Ion thermal flux | GB units | TEM |
+| `pfeITG` | Particle flux | GB units | ITG |
+| `pfeTEM` | Particle flux | GB units | TEM |
+| `gamma_max` | Maximum growth rate | 1/s | All |
+
+**Combined outputs (via `TORAXIntegration.combineFluxes`):**
+- `chi_ion` = `efiITG` + `efiTEM`
+- `chi_electron` = `efeITG` + `efeTEM` + `efeETG`
+- `particle_flux` = `pfeITG` + `pfeTEM`
+- `growth_rate` = `gamma_max`
 
 ## GPU Acceleration
 
@@ -238,12 +258,14 @@ let rLnT = TORAXIntegration.computeNormalizedGradient(
 
 ## Documentation
 
-- **[DESIGN_SUMMARY.md](DESIGN_SUMMARY.md)** - Architecture overview and design principles
+- **[API_MIGRATION.md](API_MIGRATION.md)** - API 2.0 migration guide 🆕
 - **[TORAX_INTEGRATION.md](TORAX_INTEGRATION.md)** - Complete swift-TORAX integration guide ⭐
+- **[DESIGN_SUMMARY.md](DESIGN_SUMMARY.md)** - Architecture overview and design principles
 - **[IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md)** - Technical details and known issues
 - **[TESTING.md](TESTING.md)** - Testing guide and validation
 - **[QLKNN_HYPER_INFO.md](QLKNN_HYPER_INFO.md)** - About the QLKNN model weights
 - **[STATUS.md](STATUS.md)** - Current project status
+- **[API_UPDATE_COMPLETE.md](API_UPDATE_COMPLETE.md)** - API 2.0 completion report 🆕
 
 ## Architecture
 
@@ -251,7 +273,7 @@ let rLnT = TORAXIntegration.computeNormalizedGradient(
 
 ```swift
 // FusionSurrogates uses standard MLX types
-public func predict(_ inputs: [String: MLXArray]) -> [String: MLXArray]
+public func predict(_ inputs: [String: MLXArray]) throws -> [String: MLXArray]
 
 // swift-TORAX uses EvaluatedArray (Sendable)
 public struct EvaluatedArray: Sendable {
@@ -259,8 +281,9 @@ public struct EvaluatedArray: Sendable {
 }
 
 // Conversion happens at swift-TORAX layer
-let mlxOutputs = qlknn.predict(inputs)
-let evaluated = EvaluatedArray.evaluatingBatch(mlxOutputs.values)
+let mlxOutputs = try qlknn.predict(inputs)
+let combined = TORAXIntegration.combineFluxes(mlxOutputs)
+let evaluated = EvaluatedArray.evaluatingBatch(Array(combined.values))
 ```
 
 ### Design Principles
@@ -303,7 +326,16 @@ See [`TESTING.md`](TESTING.md) for details on manual integration testing.
 - **Dependencies:**
   - [PythonKit](https://github.com/pvieito/PythonKit) - Python interop
   - [MLX-Swift](https://github.com/ml-explore/mlx-swift) - Array operations (0.29.1+)
-  - [fusion_surrogates](https://github.com/google-deepmind/fusion_surrogates) - Python library (pip)
+  - [fusion_surrogates](https://github.com/google-deepmind/fusion_surrogates) - Python library (pip, v0.4.2+)
+
+## API Version
+
+This package supports **fusion_surrogates v0.4.2+** with the new `QLKNNModel` API.
+
+- ✅ **Current API (v2.0):** `QLKNNModel.load_default_model()`
+- ❌ **Legacy API:** `QLKNN_7_11()` (not available in latest fusion_surrogates)
+
+See [API_MIGRATION.md](API_MIGRATION.md) for migration details if upgrading from older versions.
 
 ## Related Projects
 
@@ -370,12 +402,20 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Status:** ✅ Ready for swift-TORAX integration
+**Status:** ✅ Ready for swift-TORAX integration (API 2.0)
 
-**Version:** 1.0.0
+**Version:** 2.0.0 🆕
+
+**What's New in 2.0:**
+- Updated to latest fusion_surrogates API (`QLKNNModel`)
+- New parameter names (Ati/Ate instead of R_L_Ti/R_L_Te)
+- Expanded input ranges (Ati: 0-150 vs old 0-16)
+- 8 output parameters (ITG/TEM/ETG modes separated)
+- See [API_UPDATE_COMPLETE.md](API_UPDATE_COMPLETE.md) for details
 
 **Tested with:**
 - Swift 6.2
 - MLX-Swift 0.29.1
-- fusion_surrogates 0.4.2
+- fusion_surrogates 0.4.2+ (QLKNNModel API)
 - Python 3.12
+- QLKNN model: qlknn_7_11_v1
