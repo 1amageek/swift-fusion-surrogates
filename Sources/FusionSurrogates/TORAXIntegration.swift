@@ -21,7 +21,7 @@ public enum TORAXIntegration {
     public static func computeNormalizedGradient(
         profile: MLXArray,
         radius: MLXArray,
-        majorRadius: Float
+        majorRadius: Double
     ) -> MLXArray {
         // Compute derivative using finite differences
         let gradProfile = gradient(profile, radius)
@@ -45,9 +45,9 @@ public enum TORAXIntegration {
     public static func computeSafetyFactor(
         poloidalFlux: MLXArray,
         radius: MLXArray,
-        minorRadius: Float,
-        majorRadius: Float,
-        toroidalField: Float
+        minorRadius: Double,
+        majorRadius: Double,
+        toroidalField: Double
     ) -> MLXArray {
         // Simplified cylindrical approximation: q ≈ r*B_T / (R*B_p)
         // B_p ≈ d(psi)/dr / (2*pi*r)
@@ -55,7 +55,7 @@ public enum TORAXIntegration {
         let dPsiDr = gradient(poloidalFlux, radius)
         let safePsi = maximum(abs(dPsiDr), MLXArray(1e-10))
 
-        let bPoloidal = safePsi / (2.0 * Float.pi * maximum(radius, MLXArray(1e-6)))
+        let bPoloidal = safePsi / (2.0 * Double.pi * maximum(radius, MLXArray(1e-6)))
         let q = radius * MLXArray(toroidalField) / (MLXArray(majorRadius) * bPoloidal)
 
         return q
@@ -87,7 +87,7 @@ public enum TORAXIntegration {
     public static func computeCollisionality(
         density: MLXArray,
         temperature: MLXArray,
-        majorRadius: Float,
+        majorRadius: Double,
         safetyFactor: MLXArray
     ) -> MLXArray {
         // Simplified collisionality formula
@@ -227,9 +227,9 @@ extension QLKNN {
         ionDensity: MLXArray,
         poloidalFlux: MLXArray,
         radius: MLXArray,
-        majorRadius: Float,
-        minorRadius: Float,
-        toroidalField: Float
+        majorRadius: Double,
+        minorRadius: Double,
+        toroidalField: Double
     ) -> [String: MLXArray] {
 
         // Compute normalized gradients

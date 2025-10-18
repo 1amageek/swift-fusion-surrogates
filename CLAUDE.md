@@ -46,12 +46,13 @@ python3 test_new_api_final.py
 │  swift-TORAX (consumer)                                 │
 │  - Uses EvaluatedArray (Sendable, for actors)           │
 │  - Responsible for EvaluatedArray conversion            │
+│  - Standard: Double precision                           │
 └────────────────────┬────────────────────────────────────┘
                      │
                      ▼
 ┌─────────────────────────────────────────────────────────┐
 │  FusionSurrogates (this library)                        │
-│  - Uses standard MLXArray                               │
+│  - Uses standard MLXArray (Double precision)            │
 │  - Generic wrapper, not TORAX-specific                  │
 │  - Returns [String: MLXArray]                           │
 └────────────────────┬────────────────────────────────────┘
@@ -60,6 +61,7 @@ python3 test_new_api_final.py
 ┌─────────────────────────────────────────────────────────┐
 │  fusion_surrogates (Python)                             │
 │  - QLKNNModel API (v0.4.2+)                            │
+│  - Accepts float64 numpy arrays                         │
 │  - Submodule: fusion_surrogates/                        │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -202,6 +204,24 @@ Validation includes:
 - Consistent 1D shapes
 - No NaN or Inf values
 - Grid size: 2 ≤ n ≤ 10000
+
+### 4. Numeric Precision
+
+**Standard: Double precision (Float64) throughout**
+
+All numeric conversions use `Double`:
+```swift
+// MLXArray to Swift array
+let values = array.asArray(Double.self)  // ✅ Correct
+
+// Swift array to MLXArray
+let mlxArray = MLXArray([1.0, 2.0, 3.0])  // Double literals
+
+// Python numpy conversion
+let data = mlxArray.asArray(Double.self)  // → float64 numpy array
+```
+
+**Why:** swift-TORAX standardizes on Double precision for numerical accuracy.
 
 ## Common Pitfalls
 

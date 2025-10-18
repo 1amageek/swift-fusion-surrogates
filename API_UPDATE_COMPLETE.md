@@ -269,4 +269,3 @@ growth_rate:    0.019346 (gamma_max)
 **作業完了日:** 2025-10-18
 **担当:** Claude Code
 **プロジェクト:** swift-fusion-surrogates
-**バージョン:** 2.0.0 (API更新版)

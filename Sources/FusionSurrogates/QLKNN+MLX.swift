@@ -42,7 +42,7 @@ extension QLKNN {
         // Convert scalars to MLXArrays
         var mlxInputs: [String: MLXArray] = [:]
         for (key, value) in inputs {
-            mlxInputs[key] = MLXArray.repeating(Float(value), count: nCells)
+            mlxInputs[key] = MLXArray.repeating(value, count: nCells)
         }
 
         return try predict(mlxInputs)
@@ -150,7 +150,7 @@ extension QLKNN {
 
             // Check for NaN or Inf values
             eval(array)
-            let values = array.asArray(Float.self)
+            let values = array.asArray(Double.self)
             if values.contains(where: { $0.isNaN }) {
                 throw FusionSurrogatesError.predictionFailed(
                     "NaN values detected in input '\(key)'"
@@ -182,7 +182,7 @@ extension QLKNN {
 
 extension MLXArray {
     /// Create array with repeated value
-    fileprivate static func repeating(_ value: Float, count: Int) -> MLXArray {
+    fileprivate static func repeating(_ value: Double, count: Int) -> MLXArray {
         return broadcast(MLXArray(value), to: [count])
     }
 }

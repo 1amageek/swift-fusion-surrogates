@@ -5,13 +5,10 @@ A Swift wrapper for Google DeepMind's [fusion_surrogates](https://github.com/goo
 [![Swift 6.0+](https://img.shields.io/badge/Swift-6.0+-orange.svg)](https://swift.org)
 [![Platform](https://img.shields.io/badge/platform-macOS%2013.3+-lightgrey.svg)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![API Version](https://img.shields.io/badge/API-2.0%20(QLKNNModel)-green.svg)](API_MIGRATION.md)
 
 ## Overview
 
 **FusionSurrogates** provides a Swift interface to neural network surrogate models for turbulent transport in fusion plasmas. It enables fast, GPU-accelerated transport coefficient predictions for tokamak simulations on Apple Silicon.
-
-**🆕 Version 2.0:** Updated to support the latest fusion_surrogates API (`QLKNNModel`). See [API_MIGRATION.md](API_MIGRATION.md) for details.
 
 ### What is TORAX?
 
@@ -44,6 +41,7 @@ FusionSurrogates provides the transport model layer, enabling swift-TORAX to use
 ## Features
 
 - ✅ **Swift-native API** - Type-safe interface using `MLXArray`
+- ✅ **Double precision** - Float64 standard matching swift-TORAX
 - ✅ **GPU-accelerated** - MLX-native gradient computation (10-100× faster)
 - ✅ **Automatic validation** - Shape checking, NaN/Inf detection, bounds verification
 - ✅ **QLKNN support** - QuaLiKiz neural network for ITG/TEM/ETG turbulence
@@ -148,16 +146,18 @@ public struct QLKNNTransportModel: TransportModel {
         let ne = profiles.electronDensity.value
 
         // 2. Build QLKNN inputs
+        // ⚠️ IMPORTANT: Requires poloidalFlux and toroidalField data
+        // Your Geometry type must include these fields or provide them separately
         let inputs = QLKNN.buildInputs(
             electronTemperature: Te,
             ionTemperature: Ti,
             electronDensity: ne,
             ionDensity: ne,
-            poloidalFlux: profiles.poloidalFlux.value,
+            poloidalFlux: profiles.poloidalFlux.value,  // Required: ψ(r)
             radius: geometry.rho.value,
             majorRadius: majorRadius,
             minorRadius: minorRadius,
-            toroidalField: toroidalField
+            toroidalField: toroidalField                // Required: B_tor
         )
 
         // 3. Predict transport coefficients
@@ -321,12 +321,17 @@ See [`TESTING.md`](TESTING.md) for details on manual integration testing.
 ## Requirements
 
 - **Swift:** 6.0 or later
-- **Platform:** macOS 13.3 or later
+- **Platform:** macOS 13.3 or later (MLX Metal support required)
 - **Python:** 3.12 or later
 - **Dependencies:**
   - [PythonKit](https://github.com/pvieito/PythonKit) - Python interop
   - [MLX-Swift](https://github.com/ml-explore/mlx-swift) - Array operations (0.29.1+)
   - [fusion_surrogates](https://github.com/google-deepmind/fusion_surrogates) - Python library (pip, v0.4.2+)
+
+**Platform Constraints:**
+- ⚠️ **macOS only** - MLX requires Metal (Apple Silicon or Intel with Metal support)
+- ⚠️ **Python runtime required** - Not a pure Swift solution
+- ⚠️ **No Linux/Windows support** - Due to MLX Metal dependency
 
 ## API Version
 
@@ -336,6 +341,25 @@ This package supports **fusion_surrogates v0.4.2+** with the new `QLKNNModel` AP
 - ❌ **Legacy API:** `QLKNN_7_11()` (not available in latest fusion_surrogates)
 
 See [API_MIGRATION.md](API_MIGRATION.md) for migration details if upgrading from older versions.
+
+## Required Data for Integration
+
+When integrating with swift-TORAX, `TORAXIntegration.buildInputs()` requires:
+
+**From Profiles:**
+- Electron temperature: `Te(r)`
+- Ion temperature: `Ti(r)`
+- Electron density: `ne(r)`
+- Ion density: `ni(r)`
+
+**From Geometry/Magnetic Configuration:**
+- **Poloidal flux: `ψ(r)`** ⚠️ Required for safety factor calculation
+- **Toroidal field: `B_tor`** ⚠️ Required for safety factor calculation
+- Major radius: `R0`
+- Minor radius: `a`
+- Radius grid: `r`
+
+**Important:** If your `Geometry` type does not include `poloidalFlux` and `toroidalField`, you must extend it or provide these values separately. See [REVIEW_ANALYSIS.md](REVIEW_ANALYSIS.md) for details.
 
 ## Related Projects
 
@@ -402,16 +426,16 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ---
 
-**Status:** ✅ Ready for swift-TORAX integration (API 2.0)
+**Status:** ✅ Ready for swift-TORAX integration
 
-**Version:** 2.0.0 🆕
-
-**What's New in 2.0:**
+**Recent Updates:**
+- ✨ **Double precision standard** - All numeric operations use Float64 matching swift-TORAX
+- See [DOUBLE_PRECISION_UPDATE.md](DOUBLE_PRECISION_UPDATE.md) for details
 - Updated to latest fusion_surrogates API (`QLKNNModel`)
 - New parameter names (Ati/Ate instead of R_L_Ti/R_L_Te)
 - Expanded input ranges (Ati: 0-150 vs old 0-16)
 - 8 output parameters (ITG/TEM/ETG modes separated)
-- See [API_UPDATE_COMPLETE.md](API_UPDATE_COMPLETE.md) for details
+- See [API_UPDATE_COMPLETE.md](API_UPDATE_COMPLETE.md) and [API_MIGRATION.md](API_MIGRATION.md) for migration details
 
 **Tested with:**
 - Swift 6.2
