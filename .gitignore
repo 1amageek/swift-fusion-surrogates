@@ -1,0 +1,42 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager
+/.build
+/Packages
+*.xcodeproj
+*.xcworkspace
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.pbxuser
+
+# Python (for fusion_surrogates submodule)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+.Python
+venv/
+env/
+*.so
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Other
+.netrc
+*.log

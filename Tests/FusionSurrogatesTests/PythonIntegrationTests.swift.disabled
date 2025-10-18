@@ -1,0 +1,154 @@
+import Testing
+import PythonKit
+@testable import FusionSurrogates
+
+/// Python integration tests - requires fusion_surrogates installation
+/// Run with: swift test --filter PythonIntegrationTests
+@Suite("Python Integration Tests")
+struct PythonIntegrationTests {
+
+    @Test("Python fusion_surrogates import")
+    func pythonImport() throws {
+        let fusionSurrogates = Python.import("fusion_surrogates")
+        print("fusion_surrogates version:", fusionSurrogates.__version__)
+    }
+
+    @Test("QLKNN model initialization")
+    func qlknnInitialization() throws {
+        let qlknn = try QLKNN(modelVersion: "7_11")
+        print("QLKNN model initialized successfully")
+    }
+
+    @Test("Prediction with scalar inputs")
+    func predictionScalar() throws {
+        let qlknn = try QLKNN(modelVersion: "7_11")
+
+        let inputs: [String: Double] = [
+            "R_L_Te": 5.0,
+            "R_L_Ti": 5.0,
+            "R_L_ne": 1.0,
+            "R_L_ni": 1.0,
+            "q": 2.0,
+            "s_hat": 1.0,
+            "r_R": 0.3,
+            "Ti_Te": 1.0,
+            "log_nu_star": -10.0,
+            "ni_ne": 1.0
+        ]
+
+        let outputs = qlknn.predictPython(inputs)
+        let chiIon = outputs["chi_ion_itg"]
+
+        print("chi_ion_itg:", chiIon)
+
+        // Verify output is not None
+        #expect(Python.builtins.str(chiIon) != "None")
+    }
+
+    @Test("Prediction with profile arrays")
+    func predictionProfile() throws {
+        let np = Python.import("numpy")
+        let qlknn = try QLKNN(modelVersion: "7_11")
+
+        let nCells = 5
+
+        let inputs: [String: PythonObject] = [
+            "R_L_Te": np.array([5.0, 5.5, 6.0, 6.5, 7.0]),
+            "R_L_Ti": np.array([5.0, 5.5, 6.0, 6.5, 7.0]),
+            "R_L_ne": np.array([1.0, 1.2, 1.4, 1.6, 1.8]),
+            "R_L_ni": np.array([1.0, 1.2, 1.4, 1.6, 1.8]),
+            "q": np.array([1.5, 2.0, 2.5, 3.0, 3.5]),
+            "s_hat": np.array([0.8, 1.0, 1.2, 1.4, 1.6]),
+            "r_R": np.array([0.2, 0.25, 0.3, 0.35, 0.4]),
+            "Ti_Te": np.array([1.0, 1.0, 1.0, 1.0, 1.0]),
+            "log_nu_star": np.array([-12.0, -11.0, -10.0, -9.0, -8.0]),
+            "ni_ne": np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+        ]
+
+        let outputs = qlknn.predictPython(inputs)
+        let chiIon = outputs["chi_ion_itg"]
+        let shape = chiIon.shape
+
+        print("Output shape:", shape)
+        print("chi_ion_itg:", chiIon)
+
+        // Verify shape matches input
+        #expect(Int(shape[0])! == nCells)
+    }
+
+    @Test("Invalid model version throws error")
+    func invalidModelVersion() {
+        #expect(throws: FusionSurrogatesError.self) {
+            _ = try QLKNN(modelVersion: "invalid_99")
+        }
+    }
+
+    @Test("Available QLKNN models")
+    func availableModels() {
+        let fusionSurrogates = Python.import("fusion_surrogates")
+        let qlknn_module = fusionSurrogates.qlknn
+
+        let dir = Python.dir(qlknn_module)
+        var foundModels: [String] = []
+
+        for item in dir {
+            let itemStr = String(item)!
+            if itemStr.hasPrefix("QLKNN_") {
+                foundModels.append(itemStr)
+                print("Found QLKNN model:", itemStr)
+            }
+        }
+
+        #expect(foundModels.count > 0)
+    }
+
+    @Test("Prediction with Double inputs (convenience API)")
+    func predictionDoubleInputs() throws {
+        let qlknn = try QLKNN(modelVersion: "7_11")
+
+        let inputs: [String: Double] = [
+            "R_L_Te": 6.0,
+            "R_L_Ti": 6.0,
+            "R_L_ne": 2.0,
+            "R_L_ni": 2.0,
+            "q": 2.5,
+            "s_hat": 1.2,
+            "r_R": 0.35,
+            "Ti_Te": 1.0,
+            "log_nu_star": -9.0,
+            "ni_ne": 1.0
+        ]
+
+        let outputs = qlknn.predictPython(inputs)
+
+        // Check all expected outputs are present
+        let expectedOutputs = ["chi_ion_itg", "chi_electron_tem", "chi_electron_etg", "particle_flux"]
+        for key in expectedOutputs {
+            let value = outputs[key]
+            #expect(Python.builtins.str(value) != "None")
+            print("\(key):", value)
+        }
+    }
+
+    @Test("Verify output contains expected keys")
+    func outputKeys() throws {
+        let qlknn = try QLKNN(modelVersion: "7_11")
+
+        let inputs: [String: Double] = [
+            "R_L_Te": 5.0, "R_L_Ti": 5.0, "R_L_ne": 1.0, "R_L_ni": 1.0,
+            "q": 2.0, "s_hat": 1.0, "r_R": 0.3, "Ti_Te": 1.0,
+            "log_nu_star": -10.0, "ni_ne": 1.0
+        ]
+
+        let outputs = qlknn.predictPython(inputs)
+        let keys = Python.builtins.list(outputs.keys())
+
+        print("Output keys:", keys)
+
+        // Verify at least the main transport coefficients are present
+        for expectedKey in QLKNN.outputParameterNames {
+            let hasKey = Bool(keys.__contains__(expectedKey))!
+            #expect(hasKey, "Missing expected output key: \(expectedKey)")
+        }
+    }
+}
