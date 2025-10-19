@@ -125,11 +125,14 @@ extension QLKNN {
     /// - Parameter inputs: Dictionary of input arrays
     /// - Throws: FusionSurrogatesError.predictionFailed if shapes are inconsistent
     public static func validateShapes(_ inputs: [String: MLXArray]) throws {
+        print("🔍 [validateShapes] Starting validation")
+
         guard let firstArray = inputs.values.first else {
             throw FusionSurrogatesError.predictionFailed("No input arrays provided")
         }
 
         let expectedShape = firstArray.shape
+        print("🔍 [validateShapes] Expected shape: \(expectedShape)")
 
         // Check all arrays have 1D shape
         if expectedShape.count != 1 {
@@ -139,18 +142,28 @@ extension QLKNN {
         }
 
         let nCells = expectedShape[0]
+        print("🔍 [validateShapes] nCells: \(nCells)")
 
         // Check all arrays have the same shape
         for (key, array) in inputs {
+            print("🔍 [validateShapes] Checking '\(key)'...")
+
             if array.shape != expectedShape {
                 throw FusionSurrogatesError.predictionFailed(
                     "Shape mismatch for '\(key)': expected \(expectedShape), got \(array.shape)"
                 )
             }
+            print("  ✅ Shape OK")
 
             // Check for NaN or Inf values
+            print("  🔍 Calling eval()...")
             eval(array)
+            print("  ✅ eval() completed")
+
+            print("  🔍 Calling asArray()...")
             let values = array.asArray(Float.self)
+            print("  ✅ asArray() completed, got \(values.count) values")
+
             if values.contains(where: { $0.isNaN }) {
                 throw FusionSurrogatesError.predictionFailed(
                     "NaN values detected in input '\(key)'"
@@ -161,6 +174,7 @@ extension QLKNN {
                     "Infinite values detected in input '\(key)'"
                 )
             }
+            print("  ✅ '\(key)' validation complete")
         }
 
         // Validate reasonable grid size

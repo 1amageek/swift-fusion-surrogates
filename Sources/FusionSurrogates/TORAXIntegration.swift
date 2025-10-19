@@ -119,19 +119,19 @@ public enum TORAXIntegration {
         var combined: [String: MLXArray] = [:]
 
         // Total ion heat diffusivity (ITG + TEM modes)
-        let efiITG = qlknnOutputs["efiITG"] ?? MLXArray.zeros([1])
-        let efiTEM = qlknnOutputs["efiTEM"] ?? MLXArray.zeros([1])
+        let efiITG = qlknnOutputs["efiITG"] ?? MLXArray(0.0)
+        let efiTEM = qlknnOutputs["efiTEM"] ?? MLXArray(0.0)
         combined["chi_ion"] = efiITG + efiTEM
 
         // Total electron heat diffusivity (ITG + TEM + ETG modes)
-        let efeITG = qlknnOutputs["efeITG"] ?? MLXArray.zeros([1])
-        let efeTEM = qlknnOutputs["efeTEM"] ?? MLXArray.zeros([1])
-        let efeETG = qlknnOutputs["efeETG"] ?? MLXArray.zeros([1])
+        let efeITG = qlknnOutputs["efeITG"] ?? MLXArray(0.0)
+        let efeTEM = qlknnOutputs["efeTEM"] ?? MLXArray(0.0)
+        let efeETG = qlknnOutputs["efeETG"] ?? MLXArray(0.0)
         combined["chi_electron"] = efeITG + efeTEM + efeETG
 
         // Total particle flux (ITG + TEM modes)
-        let pfeITG = qlknnOutputs["pfeITG"] ?? MLXArray.zeros([1])
-        let pfeTEM = qlknnOutputs["pfeTEM"] ?? MLXArray.zeros([1])
+        let pfeITG = qlknnOutputs["pfeITG"] ?? MLXArray(0.0)
+        let pfeTEM = qlknnOutputs["pfeTEM"] ?? MLXArray(0.0)
         combined["particle_flux"] = pfeITG + pfeTEM
 
         // Particle diffusivity (same as particle flux in GyroBohm units)
@@ -139,10 +139,10 @@ public enum TORAXIntegration {
 
         // Convection velocity (assume zero for now)
         let nCells = (qlknnOutputs.values.first?.shape[0]) ?? 1
-        combined["convection_velocity"] = MLXArray.zeros([nCells])
+        combined["convection_velocity"] = MLXArray.ones([nCells]) * MLXArray(0.0)
 
         // Growth rate
-        combined["growth_rate"] = qlknnOutputs["gamma_max"] ?? MLXArray.zeros([nCells])
+        combined["growth_rate"] = qlknnOutputs["gamma_max"] ?? (MLXArray.ones([nCells]) * MLXArray(0.0))
 
         return combined
     }
