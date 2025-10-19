@@ -216,10 +216,3 @@ struct InputValidationTests {
         }
     }
 }
-
-// Helper extension for creating repeated arrays
-extension MLXArray {
-    static func repeating(_ value: Float, count: Int) -> MLXArray {
-        return MLXArray.ones([count]) * MLXArray(value)
-    }
-}
