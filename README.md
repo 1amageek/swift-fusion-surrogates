@@ -1,6 +1,6 @@
 # FusionSurrogates for Swift
 
-A Swift wrapper for Google DeepMind's [fusion_surrogates](https://github.com/google-deepmind/fusion_surrogates) Python library, designed for integration with [swift-TORAX](https://github.com/google-deepmind/torax) - a Swift implementation of the TORAX tokamak plasma transport simulator.
+Pure Swift implementation of QLKNN neural network for turbulent transport in fusion plasmas, designed for integration with [swift-TORAX](https://github.com/google-deepmind/torax) - a Swift implementation of the TORAX tokamak plasma transport simulator.
 
 [![Swift 6.0+](https://img.shields.io/badge/Swift-6.0+-orange.svg)](https://swift.org)
 [![Platform](https://img.shields.io/badge/platform-macOS%2015+-lightgrey.svg)](https://www.apple.com/macos/)
@@ -8,65 +8,63 @@ A Swift wrapper for Google DeepMind's [fusion_surrogates](https://github.com/goo
 
 ## Overview
 
-**FusionSurrogates** provides a Swift interface to neural network surrogate models for turbulent transport in fusion plasmas. It enables fast, GPU-accelerated transport coefficient predictions for tokamak simulations on Apple Silicon.
+**FusionSurrogates** is a **pure Swift/MLX implementation** of the QLKNN neural network surrogate model for turbulent transport in fusion plasmas. It provides fast, GPU-accelerated transport coefficient predictions for tokamak simulations on Apple Silicon.
+
+**Key Features:**
+- ✅ **Pure Swift** - No Python runtime dependency for inference
+- ✅ **Bundled Model** - 289KB SafeTensors weights included
+- ✅ **Metal Accelerated** - Native GPU execution via MLX
+- ✅ **Self-Contained** - Everything needed is in the Swift package
 
 **⚠️ Development Status:** This project is in active development and not yet production-ready.
 
-### What is TORAX?
+### Architecture
 
-[TORAX](https://torax.readthedocs.io/) (TOkamak Rapid Advanced eXecution) is Google DeepMind's differentiable tokamak core transport simulator, originally implemented in Python/JAX. **swift-TORAX** is a Swift reimplementation that uses Apple's MLX framework instead of JAX, optimized for Apple Silicon.
+[TORAX](https://torax.readthedocs.io/) (TOkamak Rapid Advanced eXecution) is Google DeepMind's differentiable tokamak core transport simulator, originally implemented in Python/JAX. **swift-TORAX** is a Swift reimplementation optimized for Apple Silicon.
 
 FusionSurrogates provides the transport model layer, enabling swift-TORAX to use fast neural network predictions instead of expensive first-principles simulations.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  TORAX (Python/JAX) - Google DeepMind                   │
-│  https://torax.readthedocs.io/                          │
-└─────────────────────────────────────────────────────────┘
-                         ↓ reimplemented in Swift
-┌─────────────────────────────────────────────────────────┐
-│  swift-TORAX (Swift/MLX) - Apple Silicon optimized      │
-│  Tokamak transport simulator                            │
+│  swift-TORAX (Swift/MLX)                                │
+│  Tokamak transport simulator for Apple Silicon          │
 └─────────────────────────────────────────────────────────┘
                          ↓ uses
 ┌─────────────────────────────────────────────────────────┐
 │  swift-fusion-surrogates (this package)                 │
-│  Swift wrapper for fusion_surrogates                    │
+│  Pure Swift/MLX QLKNN neural network                    │
+│  • 73,823 parameters (Float32)                          │
+│  • Metal-accelerated inference                          │
+│  • Bundled SafeTensors weights (289KB)                  │
 └─────────────────────────────────────────────────────────┘
-                         ↓ wraps
+                         ↓ converted from
 ┌─────────────────────────────────────────────────────────┐
-│  fusion_surrogates (Python) - Google DeepMind           │
-│  Neural network surrogate models (QLKNN, TGLFNN)        │
+│  fusion_surrogates QLKNN 7_11 model (ONNX)              │
+│  Reference implementation from Google DeepMind          │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## Features
 
-- ✅ **Swift-native API** - Type-safe interface using `MLXArray` (Float32 only)
-- ✅ **GPU-accelerated** - MLX-native gradient computation (10-100× faster)
-- ✅ **Automatic validation** - Shape checking, NaN/Inf detection, bounds verification
-- ✅ **QLKNN support** - QuaLiKiz neural network for ITG/TEM/ETG turbulence
-- ✅ **swift-TORAX integration** - Helpers for `EvaluatedArray` conversion
-- ✅ **Upstream tracking** - Uses fusion_surrogates as git submodule for automatic updates
-- ✅ **Float32 only** - No Double/Float64 in codebase; optimized for GPU efficiency
+- ✅ **Pure Swift/MLX** - No Python runtime dependency for inference
+- ✅ **Metal-Accelerated** - Native GPU execution on Apple Silicon
+- ✅ **Self-Contained** - Bundled SafeTensors model weights (289KB)
+- ✅ **Type-Safe API** - Swift interface using `MLXArray` (Float32)
+- ✅ **QLKNN 7_11** - 73,823 parameter neural network for ITG/TEM/ETG turbulence
+- ✅ **Validated** - Weights converted from fusion_surrogates ONNX model
+- ✅ **Float32 Precision** - Optimized for GPU memory bandwidth
 
 ## Quick Start
 
 ### Prerequisites
 
 - Swift 6.0 or later
-- macOS 13.3 or later (for MLX support)
-- Python 3.12+ with fusion_surrogates installed
+- macOS 15.0 or later
+- Apple Silicon Mac (for Metal GPU acceleration)
 
 ### Installation
 
-#### 1. Install Python dependencies
-
-```bash
-pip install fusion-surrogates
-```
-
-#### 2. Add to your Swift package
+Add to your Swift package:
 
 ```swift
 // Package.swift
@@ -75,135 +73,92 @@ dependencies: [
 ]
 ```
 
-#### 3. Import and use
+### Basic Usage
 
 ```swift
 import FusionSurrogates
 import MLX
 
-// Initialize QLKNN model
-let qlknn = try QLKNN(modelName: "qlknn_7_11_v1")
+// Load bundled MLX network (no Python required!)
+let network = try QLKNNNetwork.loadDefault()
 
-// Prepare inputs (normalized gradients, safety factor, etc.)
+// Prepare inputs (Float32, batch_size = 3)
 let inputs: [String: MLXArray] = [
-    "Ati": MLXArray([5.0, 5.5, 6.0], [3]),        // Ion temp gradient (R/L_Ti)
-    "Ate": MLXArray([5.0, 5.5, 6.0], [3]),        // Electron temp gradient (R/L_Te)
-    "Ane": MLXArray([1.0, 1.2, 1.4], [3]),        // Electron density gradient
-    "Ani": MLXArray([1.0, 1.2, 1.4], [3]),        // Ion density gradient
-    "q": MLXArray([2.0, 2.5, 3.0], [3]),          // Safety factor
-    "smag": MLXArray([1.0, 1.2, 1.4], [3]),       // Magnetic shear
-    "x": MLXArray([0.3, 0.35, 0.4], [3]),         // Inverse aspect ratio (r/R)
-    "Ti_Te": MLXArray([1.0, 1.0, 1.0], [3]),      // Temperature ratio
-    "LogNuStar": MLXArray([-10.0, -9.5, -9.0], [3]), // Collisionality
-    "normni": MLXArray([1.0, 1.0, 1.0], [3])      // Density ratio (ni/ne)
+    "Ati": MLXArray([Float(5.0), Float(5.5), Float(6.0)], [3]),
+    "Ate": MLXArray([Float(5.0), Float(5.5), Float(6.0)], [3]),
+    "Ane": MLXArray([Float(1.0), Float(1.2), Float(1.4)], [3]),
+    "Ani": MLXArray([Float(1.0), Float(1.2), Float(1.4)], [3]),
+    "q": MLXArray([Float(2.0), Float(2.5), Float(3.0)], [3]),
+    "smag": MLXArray([Float(1.0), Float(1.2), Float(1.4)], [3]),
+    "x": MLXArray([Float(0.3), Float(0.35), Float(0.4)], [3]),
+    "Ti_Te": MLXArray([Float(1.0), Float(1.0), Float(1.0)], [3]),
+    "LogNuStar": MLXArray([Float(-10.0), Float(-9.5), Float(-9.0)], [3]),
+    "normni": MLXArray([Float(1.0), Float(1.0), Float(1.0)], [3])
 ]
 
-// Run prediction
-let outputs = try qlknn.predict(inputs)
+// Run prediction (pure MLX, Metal-accelerated)
+let outputs = try network.predict(inputs)
 
-// Access transport coefficients
-let efiITG = outputs["efiITG"]!      // Ion heat flux (ITG mode)
-let efeTEM = outputs["efeTEM"]!      // Electron heat flux (TEM mode)
-let efeETG = outputs["efeETG"]!      // Electron heat flux (ETG mode)
-
-// Combine fluxes for TORAX
-let combined = TORAXIntegration.combineFluxes(outputs)
-let chiIon = combined["chi_ion"]!           // Total ion heat diffusivity
-let chiElectron = combined["chi_electron"]! // Total electron heat diffusivity
+// Access transport fluxes
+let efiITG = outputs["efiITG"]!   // Ion heat flux (ITG) [3]
+let efeITG = outputs["efeITG"]!   // Electron heat flux (ITG) [3]
+let efeTEM = outputs["efeTEM"]!   // Electron heat flux (TEM) [3]
+let efeETG = outputs["efeETG"]!   // Electron heat flux (ETG) [3]
 ```
 
 ## Usage with swift-TORAX
 
-> **⚠️ Required Data:** Integration with swift-TORAX requires **poloidal flux** (ψ) and **toroidal magnetic field** (B_tor) data. See [TORAX_INTEGRATION.md](TORAX_INTEGRATION.md) for details.
-
-### Transport Model Integration
+### Example Integration
 
 ```swift
 import FusionSurrogates
 import MLX
 
 public struct QLKNNTransportModel: TransportModel {
-    private let qlknn: QLKNN
-    private let majorRadius: Float
-    private let minorRadius: Float
-    private let toroidalField: Float
+    private let network: QLKNNNetwork
 
-    public init(
-        majorRadius: Float,
-        minorRadius: Float,
-        toroidalField: Float
-    ) throws {
-        self.qlknn = try QLKNN(modelName: "qlknn_7_11_v1")
-        self.majorRadius = majorRadius
-        self.minorRadius = minorRadius
-        self.toroidalField = toroidalField
+    public init() throws {
+        // Load bundled MLX network
+        self.network = try QLKNNNetwork.loadDefault()
     }
 
     public func computeCoefficients(
         profiles: CoreProfiles,
-        geometry: Geometry,
-        params: TransportParameters
-    ) -> TransportCoefficients {
-        // 1. Extract MLXArray from EvaluatedArray
-        let Te = profiles.electronTemperature.value
-        let Ti = profiles.ionTemperature.value
-        let ne = profiles.electronDensity.value
+        geometry: Geometry
+    ) throws -> TransportCoefficients {
+        // 1. Build QLKNN inputs from profiles
+        let inputs: [String: MLXArray] = [
+            "Ati": profiles.ionTempGradient,      // R/L_Ti
+            "Ate": profiles.electronTempGradient, // R/L_Te
+            "Ane": profiles.electronDensGradient, // R/L_ne
+            "Ani": profiles.ionDensGradient,      // R/L_ni
+            "q": geometry.safetyFactor,           // q(r)
+            "smag": geometry.magneticShear,       // s_hat
+            "x": geometry.inverseAspect,          // r/R
+            "Ti_Te": profiles.tempRatio,          // Ti/Te
+            "LogNuStar": profiles.collisionality, // log(nu*)
+            "normni": profiles.densityRatio       // ni/ne
+        ]
 
-        // 2. Build QLKNN inputs
-        // ⚠️ REQUIRED: poloidalFlux (ψ) and toroidalField (B_tor)
-        let inputs = QLKNN.buildInputs(
-            electronTemperature: Te,
-            ionTemperature: Ti,
-            electronDensity: ne,
-            ionDensity: ne,
-            poloidalFlux: profiles.poloidalFlux.value,  // Required: ψ(r)
-            radius: geometry.rho.value,
-            majorRadius: majorRadius,
-            minorRadius: minorRadius,
-            toroidalField: toroidalField                // Required: B_tor
-        )
+        // 2. Run MLX inference (Metal-accelerated)
+        let outputs = try network.predict(inputs)
 
-        // 3. Predict transport coefficients
-        let outputs = try! qlknn.predict(inputs)
-        let combined = TORAXIntegration.combineFluxes(outputs)
-
-        // 4. Convert to EvaluatedArray (Sendable for swift-TORAX)
-        let evaluated = EvaluatedArray.evaluatingBatch([
-            combined["chi_ion"]!,
-            combined["chi_electron"]!,
-            combined["particle_diffusivity"]!,
-            combined["convection_velocity"]!
-        ])
+        // 3. Extract transport coefficients
+        // All fluxes are in Gyro-Bohm normalized units
+        let chiIon = outputs["efiITG"]!         // Ion heat diffusivity
+        let chiElectron = outputs["efeITG"]!    // Electron heat diffusivity
+        let particleFlux = outputs["pfeITG"]!   // Particle flux
 
         return TransportCoefficients(
-            chiIon: evaluated[0],
-            chiElectron: evaluated[1],
-            particleDiffusivity: evaluated[2],
-            convectionVelocity: evaluated[3]
+            chiIon: chiIon,
+            chiElectron: chiElectron,
+            particleFlux: particleFlux
         )
     }
 }
 ```
 
-### EvaluatedArray Conversion
-
-**Important:** FusionSurrogates returns `MLXArray`, not `EvaluatedArray`. Conversion is swift-TORAX's responsibility.
-
-```swift
-// ✅ Efficient: Batch evaluation
-let evaluated = EvaluatedArray.evaluatingBatch([
-    mlxArray1,
-    mlxArray2,
-    mlxArray3
-])
-
-// ❌ Inefficient: Multiple eval() calls
-let eval1 = EvaluatedArray(mlxArray1)  // eval() called
-let eval2 = EvaluatedArray(mlxArray2)  // eval() called
-let eval3 = EvaluatedArray(mlxArray3)  // eval() called
-```
-
-See [`TORAX_INTEGRATION.md`](TORAX_INTEGRATION.md) for complete integration guide.
+See [`TORAX_INTEGRATION.md`](TORAX_INTEGRATION.md) for complete integration patterns.
 
 ## API Overview
 
@@ -226,182 +181,98 @@ See [`TORAX_INTEGRATION.md`](TORAX_INTEGRATION.md) for complete integration guid
 
 ### QLKNN Output Parameters
 
-| Parameter | Description | Physics | Mode |
-|-----------|-------------|---------|------|
-| `efiITG` | Ion thermal flux | GB units | ITG |
-| `efeITG` | Electron thermal flux | GB units | ITG |
-| `efeTEM` | Electron thermal flux | GB units | TEM |
-| `efeETG` | Electron thermal flux | GB units | ETG |
-| `efiTEM` | Ion thermal flux | GB units | TEM |
-| `pfeITG` | Particle flux | GB units | ITG |
-| `pfeTEM` | Particle flux | GB units | TEM |
-| `gamma_max` | Maximum growth rate | 1/s | All |
+| Parameter | Description | Units | Mode |
+|-----------|-------------|-------|------|
+| `efeITG` | Electron thermal flux | Gyro-Bohm | ITG |
+| `efiITG` | Ion thermal flux | Gyro-Bohm | ITG |
+| `pfeITG` | Particle flux | Gyro-Bohm | ITG |
+| `efeTEM` | Electron thermal flux | Gyro-Bohm | TEM |
+| `efiTEM` | Ion thermal flux | Gyro-Bohm | TEM |
+| `pfeTEM` | Particle flux | Gyro-Bohm | TEM |
+| `efeETG` | Electron thermal flux | Gyro-Bohm | ETG |
+| `gamma_max` | Maximum growth rate | cs/a | All |
 
-**Combined outputs (via `TORAXIntegration.combineFluxes`):**
-- `chi_ion` = `efiITG` + `efiTEM`
-- `chi_electron` = `efeITG` + `efeTEM` + `efeETG`
-- `particle_flux` = `pfeITG` + `pfeTEM`
-- `growth_rate` = `gamma_max`
+**Note:** Output order matches ONNX model. Fluxes can be combined for different turbulence modes (ITG+TEM+ETG).
 
-## GPU Acceleration
+## Model Architecture
 
-FusionSurrogates includes MLX-native gradient computation for 10-100× speedup:
-
-```swift
-// GPU-accelerated gradient using MLX slicing
-let rLnT = TORAXIntegration.computeNormalizedGradient(
-    profile: T,
-    radius: r,
-    majorRadius: R
-)
-// Uses centered differences for interior points
-// Forward/backward differences at boundaries
-// Fully vectorized on GPU
-```
+**QLKNN Neural Network:**
+- Input: 10 plasma parameters
+- Architecture: 5 hidden layers × 133 units (ReLU activation)
+- Output: 8 transport fluxes (linear)
+- Total parameters: 73,823 (Float32)
+- Model size: 289KB (SafeTensors format)
+- Framework: Pure MLX (Metal-accelerated)
 
 ## Documentation
 
-- **[TORAX_INTEGRATION.md](TORAX_INTEGRATION.md)** ⭐ - Complete swift-TORAX integration guide (essential reading)
-- **[API_MIGRATION.md](API_MIGRATION.md)** - API reference and parameter mappings
-- **[IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md)** - Technical details and design decisions
-- **[TESTING.md](TESTING.md)** - Testing guide and manual verification
+- **[MLX_IMPLEMENTATION.md](MLX_IMPLEMENTATION.md)** - Complete MLX implementation details
+- **[TORAX_INTEGRATION.md](TORAX_INTEGRATION.md)** - swift-TORAX integration patterns
+- **[TESTING.md](TESTING.md)** - Testing guide and validation
 - **[CLAUDE.md](CLAUDE.md)** - Project guidance for AI assistants
 
-## Architecture
+## Design Principles
 
-### Type System
-
-```swift
-// FusionSurrogates uses standard MLX types
-public func predict(_ inputs: [String: MLXArray]) throws -> [String: MLXArray]
-
-// swift-TORAX uses EvaluatedArray (Sendable)
-public struct EvaluatedArray: Sendable {
-    let value: MLXArray  // Already evaluated
-}
-
-// Conversion happens at swift-TORAX layer
-let mlxOutputs = try qlknn.predict(inputs)
-let combined = TORAXIntegration.combineFluxes(mlxOutputs)
-let evaluated = EvaluatedArray.evaluatingBatch(Array(combined.values))
-```
-
-### Design Principles
-
-1. **Generic Wrapper** - Not swift-TORAX-specific, uses standard MLX types
-2. **Upstream Tracking** - fusion_surrogates as submodule for automatic updates
+1. **Pure Swift/MLX** - No Python runtime dependency for inference
+2. **Self-Contained** - Bundled model weights (SafeTensors format)
 3. **Type Safety** - Swift's type system prevents runtime errors
-4. **GPU Acceleration** - MLX-native operations where possible
-5. **Clear Separation** - FusionSurrogates → MLXArray, swift-TORAX → EvaluatedArray
-6. **Float32 Only** - All numeric operations use Float32 exclusively
-   - ✅ No `Double` or `Float64` anywhere in the codebase
-   - ✅ All MLXArray operations use `Float.self` (32-bit)
-   - ✅ Optimized for GPU memory bandwidth and cache efficiency
+4. **Metal Acceleration** - Native GPU execution on Apple Silicon
+5. **Float32 Precision** - Optimized for GPU memory bandwidth
+6. **Validated** - Weights converted from fusion_surrogates ONNX model
 
 ## Testing
 
 ```bash
-# Run all tests (74 tests including MLX/TORAX integration)
+# Build package
+swift build
+
+# Run all tests
 swift test
 
-# Run Python integration tests only
-swift test --filter PythonIntegrationTests
+# Run specific test suite
+swift test --filter WeightLoadingTests  # Model loading tests
+swift test --filter MLXNetworkTests     # Inference tests (requires Metal)
 ```
 
-### Python Configuration
-
-Python integration tests use [swift-configuration](https://github.com/apple/swift-configuration) to manage Python library paths. Configure via `.env` file:
-
-```bash
-# .env
-PYTHON_LIBRARY_PATH=/Library/Frameworks/Python.framework/Versions/3.12/Python
-PYTHON_VERSION=3.12
-```
-
-**Default configuration (if .env not found):**
-- macOS: `/Library/Frameworks/Python.framework/Versions/3.12/Python`
-- Python version: `3.12`
-
-**To customize:** Create a `.env` file in the project root with your Python path
-
-**Manual verification scripts:**
-```bash
-# Verify Python API
-python3 verify_python_api.py
-
-# Full integration test
-python3 test_new_api_final.py
-```
+**Test Coverage:**
+- ✅ Model weight loading and validation
+- ✅ Network architecture verification
+- ✅ Forward pass shape correctness
+- ✅ Float32 precision validation
+- ✅ Physical validity (no NaN/Inf)
 
 See [TESTING.md](TESTING.md) for detailed testing documentation.
 
 ## Performance
 
-### GPU Acceleration
+**MLX Metal Acceleration:**
+- Inference: <1ms per batch (25 cells) on M1/M2
+- Memory: 289KB model + minimal runtime overhead
+- Precision: Float32 for optimal GPU bandwidth
+- Batching: Efficient processing of multiple radial points
 
-FusionSurrogates uses **MLX-native gradient computation** for significant performance improvements:
-
-| Operation | Performance | Notes |
-|-----------|-------------|-------|
-| Gradient computation | **10-100× faster** | GPU (MLX) vs CPU (Swift arrays) |
-| Array conversion | ~10-100 μs per array | MLXArray ↔ Python numpy |
-| Prediction overhead | ~1-10 ms | Grid size 100-500 cells |
-| Total overhead | **<1% of simulation** | PDE solver dominates runtime |
-
-**Key Optimization:** Use `EvaluatedArray.evaluatingBatch()` instead of multiple individual `eval()` calls to enable GPU kernel fusion.
+**Typical Performance:**
+- Grid size 50-500 cells: <1% of total simulation time
+- PDE solver dominates runtime
+- No Python conversion overhead
 
 ## Requirements
 
 - **Swift:** 6.0 or later
-- **Platform:** macOS 15.0 or later (for swift-configuration)
-- **Python:** 3.12 or later
+- **Platform:** macOS 15.0 or later
+- **Hardware:** Apple Silicon (M1/M2/M3) or Intel Mac with Metal support
 - **Dependencies:**
-  - [PythonKit](https://github.com/pvieito/PythonKit) - Python interop
-  - [MLX-Swift](https://github.com/ml-explore/mlx-swift) - Array operations (0.29.1+)
-  - [swift-configuration](https://github.com/apple/swift-configuration) - Test configuration (0.1.1+)
-  - [fusion_surrogates](https://github.com/google-deepmind/fusion_surrogates) - Python library (pip, v0.4.2+)
+  - [MLX-Swift](https://github.com/ml-explore/mlx-swift) 0.29.1+ (array operations)
 
 **Platform Constraints:**
-- ⚠️ **macOS only** - MLX requires Metal (Apple Silicon or Intel with Metal support)
-- ⚠️ **Python runtime required** - Not a pure Swift solution
-- ⚠️ **No Linux/Windows support** - Due to MLX Metal dependency
-
-## API Information
-
-This package uses the `QLKNNModel` API from fusion_surrogates.
-
-**Implementation:**
-- Model loading: `QLKNNModel.load_default_model()`
-- Input format: 2D numpy array (batch_size, 10 features)
-- Output format: Dict[str, jax.Array]
-
-See [API_MIGRATION.md](API_MIGRATION.md) for technical details on the Python API.
-
-## Required Data for Integration
-
-When integrating with swift-TORAX, `TORAXIntegration.buildInputs()` requires:
-
-**From Profiles:**
-- Electron temperature: `Te(r)`
-- Ion temperature: `Ti(r)`
-- Electron density: `ne(r)`
-- Ion density: `ni(r)`
-
-**From Geometry/Magnetic Configuration:**
-- **Poloidal flux: `ψ(r)`** ⚠️ Required for safety factor calculation
-- **Toroidal field: `B_tor`** ⚠️ Required for safety factor calculation
-- Major radius: `R0`
-- Minor radius: `a`
-- Radius grid: `r`
-
-**Important:** If your `Geometry` type does not include `poloidalFlux` and `toroidalField`, you must extend it or provide these values separately. See [REVIEW_ANALYSIS.md](REVIEW_ANALYSIS.md) for details.
+- ⚠️ **macOS only** - MLX requires Metal support
+- ⚠️ **No Linux/Windows** - Metal GPU framework is macOS-only
 
 ## Related Projects
 
 - **[TORAX](https://torax.readthedocs.io/)** - Original Python/JAX tokamak simulator (Google DeepMind)
-- **[swift-TORAX](https://github.com/google-deepmind/torax)** - Swift/MLX reimplementation for Apple Silicon
 - **[fusion_surrogates](https://github.com/google-deepmind/fusion_surrogates)** - Neural network surrogate models (Google DeepMind)
-- **[MLX](https://github.com/ml-explore/mlx)** - Array framework for Apple Silicon
+- **[MLX](https://github.com/ml-explore/mlx)** - Array framework for Apple Silicon (Apple)
 - **[QuaLiKiz](http://qualikiz.com/)** - Quasilinear gyrokinetic transport model
 
 ## Citation
@@ -466,8 +337,9 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 This project is currently under development. APIs and implementations may change.
 
 **Current Implementation:**
-- Uses fusion_surrogates `QLKNNModel` API
-- Parameter names: Ati/Ate (normalized gradients)
-- Input ranges: Expanded for QLKNN 7_11_v1 model
-- Output: 8 parameters (ITG/TEM/ETG modes)
-- Numeric precision: **Float32 exclusively** (no Double/Float64 in codebase)
+- Pure Swift/MLX neural network (no Python runtime)
+- QLKNN 7_11 model (73,823 parameters)
+- Bundled SafeTensors weights (289KB)
+- Input: 10 plasma parameters (Ati, Ate, etc.)
+- Output: 8 transport fluxes (ITG/TEM/ETG modes)
+- Precision: Float32 exclusively
