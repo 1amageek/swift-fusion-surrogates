@@ -35,7 +35,7 @@ public class QLKNN {
         let qlknnModule = fusionSurrogates.qlknn.qlknn_model
         let QLKNNModel = qlknnModule.QLKNNModel
 
-        // Load model using the new API
+        // Load model using QLKNNModel API
         if modelName == "qlknn_7_11_v1" || modelName == "default" {
             self.model = QLKNNModel.load_default_model()
         } else {

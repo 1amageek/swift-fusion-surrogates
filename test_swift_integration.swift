@@ -55,7 +55,7 @@ do {
     print("\n6. Output parameters:")
     for (key, value) in outputs.sorted(by: { $0.key < $1.key }) {
         eval(value)
-        let values = value.asArray(Double.self)
+        let values = value.asArray(Float.self)
         print("   \(key): [\(values[0]), \(values[1]), \(values[2])]")
     }
 
@@ -66,7 +66,7 @@ do {
 
     for (key, value) in combined.sorted(by: { $0.key < $1.key }) {
         eval(value)
-        let values = value.asArray(Double.self)
+        let values = value.asArray(Float.self)
         if values.count >= 3 {
             print("   \(key): [\(values[0]), \(values[1]), \(values[2])]")
         } else if values.count > 0 {

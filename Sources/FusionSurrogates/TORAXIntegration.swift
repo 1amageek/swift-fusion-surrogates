@@ -21,7 +21,7 @@ public enum TORAXIntegration {
     public static func computeNormalizedGradient(
         profile: MLXArray,
         radius: MLXArray,
-        majorRadius: Double
+        majorRadius: Float
     ) -> MLXArray {
         // Compute derivative using finite differences
         let gradProfile = gradient(profile, radius)
@@ -45,9 +45,9 @@ public enum TORAXIntegration {
     public static func computeSafetyFactor(
         poloidalFlux: MLXArray,
         radius: MLXArray,
-        minorRadius: Double,
-        majorRadius: Double,
-        toroidalField: Double
+        minorRadius: Float,
+        majorRadius: Float,
+        toroidalField: Float
     ) -> MLXArray {
         // Simplified cylindrical approximation: q ≈ r*B_T / (R*B_p)
         // B_p ≈ d(psi)/dr / (2*pi*r)
@@ -55,7 +55,7 @@ public enum TORAXIntegration {
         let dPsiDr = gradient(poloidalFlux, radius)
         let safePsi = maximum(abs(dPsiDr), MLXArray(1e-10))
 
-        let bPoloidal = safePsi / (2.0 * Double.pi * maximum(radius, MLXArray(1e-6)))
+        let bPoloidal = safePsi / (2.0 * Float.pi * maximum(radius, MLXArray(1e-6)))
         let q = radius * MLXArray(toroidalField) / (MLXArray(majorRadius) * bPoloidal)
 
         return q
@@ -87,7 +87,7 @@ public enum TORAXIntegration {
     public static func computeCollisionality(
         density: MLXArray,
         temperature: MLXArray,
-        majorRadius: Double,
+        majorRadius: Float,
         safetyFactor: MLXArray
     ) -> MLXArray {
         // Simplified collisionality formula
@@ -104,7 +104,7 @@ public enum TORAXIntegration {
 
     /// Combine QLKNN flux predictions into total transport coefficients
     ///
-    /// New QLKNN API outputs separate contributions from ITG, TEM, and ETG modes:
+    /// QLKNN outputs separate contributions from ITG, TEM, and ETG modes:
     /// - efiITG, efeITG: Ion/electron thermal flux (ITG mode)
     /// - efiTEM, efeTEM: Ion/electron thermal flux (TEM mode)
     /// - efeETG: Electron thermal flux (ETG mode)
@@ -113,7 +113,7 @@ public enum TORAXIntegration {
     ///
     /// This combines them into total chi_ion and chi_electron for TORAX.
     ///
-    /// - Parameter qlknnOutputs: Dictionary of QLKNN predictions (new API names)
+    /// - Parameter qlknnOutputs: Dictionary of QLKNN predictions
     /// - Returns: Dictionary with combined transport coefficients
     public static func combineFluxes(_ qlknnOutputs: [String: MLXArray]) -> [String: MLXArray] {
         var combined: [String: MLXArray] = [:]
@@ -227,9 +227,9 @@ extension QLKNN {
         ionDensity: MLXArray,
         poloidalFlux: MLXArray,
         radius: MLXArray,
-        majorRadius: Double,
-        minorRadius: Double,
-        toroidalField: Double
+        majorRadius: Float,
+        minorRadius: Float,
+        toroidalField: Float
     ) -> [String: MLXArray] {
 
         // Compute normalized gradients

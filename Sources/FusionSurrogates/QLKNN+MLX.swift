@@ -21,7 +21,7 @@ extension QLKNN {
         // Convert MLXArrays to 2D numpy array (batch_size, 10)
         let pythonInputArray = MLXConversion.batchToPythonArray(inputs)
 
-        // Call Python prediction (new API returns dict of JAX arrays)
+        // Call Python prediction (returns dict of JAX arrays)
         let pythonOutputs = model.predict(pythonInputArray)
 
         // Convert outputs back to MLXArrays
@@ -36,7 +36,7 @@ extension QLKNN {
     /// - Returns: Dictionary of output arrays
     /// - Throws: FusionSurrogatesError if prediction fails
     public func predictScalar(
-        _ inputs: [String: Double],
+        _ inputs: [String: Float],
         nCells: Int
     ) throws -> [String: MLXArray] {
         // Convert scalars to MLXArrays
@@ -65,7 +65,7 @@ extension QLKNN {
 
 extension QLKNN {
 
-    /// Input parameter names expected by QLKNN model (new API)
+    /// Input parameter names expected by QLKNN model
     /// Order matters: must match model.config.input_names
     public static let inputParameterNames: [String] = [
         "Ati",        // R/L_Ti - Normalized ion temperature gradient
@@ -80,7 +80,7 @@ extension QLKNN {
         "normni"      // Normalized ion density (ni/ne)
     ]
 
-    /// Output parameter names returned by QLKNN model (new API)
+    /// Output parameter names returned by QLKNN model
     public static let outputParameterNames: [String] = [
         "efiITG",     // Ion thermal flux (ITG mode) [GB units]
         "efeITG",     // Electron thermal flux (ITG mode)
@@ -106,11 +106,11 @@ extension QLKNN {
         }
     }
 
-    /// Validate input dictionary with Double values
+    /// Validate input dictionary with Float values
     ///
     /// - Parameter inputs: Dictionary to validate
     /// - Throws: FusionSurrogatesError.missingInput if any required parameter is missing
-    public static func validateInputs(_ inputs: [String: Double]) throws {
+    public static func validateInputs(_ inputs: [String: Float]) throws {
         for paramName in inputParameterNames {
             guard inputs[paramName] != nil else {
                 throw FusionSurrogatesError.predictionFailed(
@@ -150,7 +150,7 @@ extension QLKNN {
 
             // Check for NaN or Inf values
             eval(array)
-            let values = array.asArray(Double.self)
+            let values = array.asArray(Float.self)
             if values.contains(where: { $0.isNaN }) {
                 throw FusionSurrogatesError.predictionFailed(
                     "NaN values detected in input '\(key)'"
@@ -182,7 +182,7 @@ extension QLKNN {
 
 extension MLXArray {
     /// Create array with repeated value
-    fileprivate static func repeating(_ value: Double, count: Int) -> MLXArray {
+    fileprivate static func repeating(_ value: Float, count: Int) -> MLXArray {
         return broadcast(MLXArray(value), to: [count])
     }
 }

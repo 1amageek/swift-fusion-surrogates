@@ -46,13 +46,12 @@ python3 test_new_api_final.py
 │  swift-TORAX (consumer)                                 │
 │  - Uses EvaluatedArray (Sendable, for actors)           │
 │  - Responsible for EvaluatedArray conversion            │
-│  - Standard: Double precision                           │
 └────────────────────┬────────────────────────────────────┘
                      │
                      ▼
 ┌─────────────────────────────────────────────────────────┐
 │  FusionSurrogates (this library)                        │
-│  - Uses standard MLXArray (Double precision)            │
+│  - Uses standard MLXArray (Float32)                     │
 │  - Generic wrapper, not TORAX-specific                  │
 │  - Returns [String: MLXArray]                           │
 └────────────────────┬────────────────────────────────────┘
@@ -61,10 +60,21 @@ python3 test_new_api_final.py
 ┌─────────────────────────────────────────────────────────┐
 │  fusion_surrogates (Python)                             │
 │  - QLKNNModel API (v0.4.2+)                            │
-│  - Accepts float64 numpy arrays                         │
 │  - Submodule: fusion_surrogates/                        │
 └─────────────────────────────────────────────────────────┘
 ```
+
+### Numeric Precision Policy
+
+**All numeric types use Float32 (32-bit floating point) exclusively throughout the codebase:**
+
+- **Public APIs**: Accept `Float` (not `Double`)
+- **Internal calculations**: Use `Float` for MLX operations
+- **Python conversion**: Convert between Float32 and Python numpy float32
+- **Strict Policy**: `Double` and `Float64` are **completely absent** from the codebase
+  - ✅ Verified: No `Double` or `Float64` in Sources/, Tests/, or scripts
+  - ✅ All MLXArray operations use `Float.self`
+- **Rationale**: GPU efficiency, memory bandwidth optimization, and consistency with MLX best practices
 
 ### Core Components (Sources/FusionSurrogates/)
 
@@ -76,7 +86,7 @@ python3 test_new_api_final.py
 2. **QLKNN+MLX.swift**
    - High-level MLX API (recommended)
    - `predict()`: Converts MLXArray → Python → MLXArray
-   - Input/output parameter name definitions (API v2.0)
+   - Input/output parameter name definitions
    - Input validation: shape checking, NaN/Inf detection
 
 3. **MLXConversion.swift**
@@ -90,9 +100,9 @@ python3 test_new_api_final.py
    - `combineFluxes()`: Combines ITG/TEM/ETG mode outputs into total transport coefficients
    - **MLX-native gradient computation** (GPU-accelerated, 10-100× faster than CPU)
 
-### API Version 2.0 (Current)
+### Input Parameters
 
-**Input Parameters (10):**
+**10 input parameters:**
 ```swift
 QLKNN.inputParameterNames = [
     "Ati",        // R/L_Ti (ion temperature gradient)
@@ -122,12 +132,12 @@ QLKNN.outputParameterNames = [
 ]
 ```
 
-**Important:** Parameter names changed from v1.0. See `API_MIGRATION.md` for complete mapping.
+**Note:** See `API_MIGRATION.md` for technical details on parameter definitions.
 
 ## Type Flow Pattern
 
 ```swift
-// 1. FusionSurrogates returns MLXArray
+// 1. FusionSurrogates returns MLXArray (Float32)
 let mlxOutputs: [String: MLXArray] = try qlknn.predict(inputs)
 
 // 2. Combine mode-specific fluxes
@@ -142,7 +152,9 @@ let evaluated = EvaluatedArray.evaluatingBatch([
 ])
 ```
 
-**Critical Design Decision:** FusionSurrogates MUST NOT return `EvaluatedArray`. It uses standard MLX types for generic compatibility.
+**Critical Design Decisions:**
+- FusionSurrogates MUST NOT return `EvaluatedArray`. It uses standard MLX types for generic compatibility.
+- All MLXArrays use Float32 (not Float64) for GPU efficiency and memory bandwidth optimization.
 
 ## Python Dependency
 
@@ -205,45 +217,28 @@ Validation includes:
 - No NaN or Inf values
 - Grid size: 2 ≤ n ≤ 10000
 
-### 4. Numeric Precision
-
-**Standard: Double precision (Float64) throughout**
-
-All numeric conversions use `Double`:
-```swift
-// MLXArray to Swift array
-let values = array.asArray(Double.self)  // ✅ Correct
-
-// Swift array to MLXArray
-let mlxArray = MLXArray([1.0, 2.0, 3.0])  // Double literals
-
-// Python numpy conversion
-let data = mlxArray.asArray(Double.self)  // → float64 numpy array
-```
-
-**Why:** swift-TORAX standardizes on Double precision for numerical accuracy.
-
 ## Common Pitfalls
 
 ### 1. Wrong Input Order in batchToPythonArray
 
-The new API requires a 2D numpy array with features in EXACT order:
+The API requires a 2D numpy array with features in EXACT order:
 ```swift
 [Ati, Ate, Ane, Ani, q, smag, x, Ti_Te, LogNuStar, normni]
 ```
 
 `MLXConversion.batchToPythonArray()` handles this automatically. Do NOT manually construct 2D arrays.
 
-### 2. Using Legacy Parameter Names
+### 2. Incorrect Parameter Names
 
-❌ Old (v1.0): `"R_L_Te"`, `"s_hat"`, `"r_R"`, `"log_nu_star"`
-✅ New (v2.0): `"Ate"`, `"smag"`, `"x"`, `"LogNuStar"`
-
-Check `QLKNN.inputParameterNames` for current names.
+Use the exact names defined in `QLKNN.inputParameterNames`:
+- `"Ate"` (not "R_L_Te")
+- `"smag"` (not "s_hat")
+- `"x"` (not "r_R")
+- `"LogNuStar"` (not "log_nu_star")
 
 ### 3. Assuming Dict Input to Python
 
-The new `QLKNNModel` API requires:
+The `QLKNNModel` API requires:
 ```python
 inputs = np.array([[...]])  # 2D array, NOT dict
 outputs = model.predict(inputs)
@@ -253,7 +248,14 @@ outputs = model.predict(inputs)
 
 ### 4. Returning EvaluatedArray from FusionSurrogates
 
-FusionSurrogates returns `MLXArray`, NOT `EvaluatedArray`. Conversion is swift-TORAX's responsibility.
+FusionSurrogates returns `MLXArray` (Float32), NOT `EvaluatedArray`. Conversion is swift-TORAX's responsibility.
+
+### 5. Using Double Instead of Float
+
+❌ Wrong: `let inputs: [String: Double]`
+✅ Correct: `let inputs: [String: Float]`
+
+All public APIs and internal calculations use Float32 for GPU efficiency.
 
 ## Testing Strategy
 
@@ -273,10 +275,10 @@ FusionSurrogates returns `MLXArray`, NOT `EvaluatedArray`. Conversion is swift-T
 
 ## Critical Files for Understanding
 
-1. **API_MIGRATION.md** - Complete parameter mapping (v1.0 → v2.0)
-2. **TORAX_INTEGRATION.md** - swift-TORAX integration patterns
-3. **DESIGN_SUMMARY.md** - Type system architecture
-4. **API_UPDATE_COMPLETE.md** - v2.0 migration completion report
+1. **TORAX_INTEGRATION.md** - swift-TORAX integration patterns (essential)
+2. **API_MIGRATION.md** - Parameter definitions and Python API details
+3. **IMPLEMENTATION_NOTES.md** - Technical details and design decisions
+4. **TESTING.md** - Testing guide and manual verification
 
 ## Model Information
 
@@ -295,7 +297,7 @@ FusionSurrogates returns `MLXArray`, NOT `EvaluatedArray`. Conversion is swift-T
 3. Update `TORAXIntegration.swift` if needed for helper functions
 4. Add parameter name constants to `QLKNN+MLX.swift` pattern
 
-### Updating for New fusion_surrogates API
+### Updating for fusion_surrogates API Changes
 1. Check `verify_python_api.py` for API changes
 2. Update `FusionSurrogates.swift` (model loading)
 3. Update `MLXConversion.swift` (input/output format)
@@ -317,7 +319,9 @@ FusionSurrogates returns `MLXArray`, NOT `EvaluatedArray`. Conversion is swift-T
 
 **Platform:** macOS 13.3+ (for MLX Metal support)
 
-## Version History
+## Current Status
 
-- **v1.0.0**: Initial release (legacy API, not fully implemented)
-- **v2.0.0**: Updated to QLKNNModel API, new parameter names, expanded ranges
+- Uses fusion_surrogates `QLKNNModel` API
+- Parameter names: Ati, Ate, etc. (QuaLiKiz standard)
+- Input ranges: Expanded for QLKNN 7_11_v1 model
+- Float32 precision throughout (no Double/Float64)

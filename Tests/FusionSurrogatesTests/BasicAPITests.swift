@@ -5,7 +5,7 @@ import Testing
 @Suite("Basic API Tests")
 struct BasicAPITests {
 
-    @Test("QLKNN input parameter names (new API)")
+    @Test("QLKNN input parameter names")
     func inputParameterNames() {
         let names = QLKNN.inputParameterNames
         #expect(names.count == 10)
@@ -14,14 +14,14 @@ struct BasicAPITests {
         #expect(names.contains("Ane"))        // R/L_ne
         #expect(names.contains("Ani"))        // R/L_ni
         #expect(names.contains("q"))          // Safety factor
-        #expect(names.contains("smag"))       // Magnetic shear (was s_hat)
-        #expect(names.contains("x"))          // r/R (was r_R)
+        #expect(names.contains("smag"))       // Magnetic shear
+        #expect(names.contains("x"))          // r/R
         #expect(names.contains("Ti_Te"))      // Temperature ratio
-        #expect(names.contains("LogNuStar"))  // Collisionality (was log_nu_star)
-        #expect(names.contains("normni"))     // ni/ne (was ni_ne)
+        #expect(names.contains("LogNuStar"))  // Collisionality
+        #expect(names.contains("normni"))     // ni/ne
     }
 
-    @Test("QLKNN output parameter names (new API)")
+    @Test("QLKNN output parameter names")
     func outputParameterNames() {
         let names = QLKNN.outputParameterNames
         #expect(names.count == 8)

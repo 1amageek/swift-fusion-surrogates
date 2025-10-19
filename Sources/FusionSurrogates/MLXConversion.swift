@@ -16,7 +16,7 @@ public enum MLXConversion {
 
         // Get shape and data
         let shape = mlxArray.shape
-        let data = mlxArray.asArray(Double.self)
+        let data = mlxArray.asArray(Float.self)
 
         // Create numpy array from Swift array
         let pythonArray = np.array(data)
@@ -28,27 +28,16 @@ public enum MLXConversion {
     /// Convert Python numpy array to MLXArray
     ///
     /// - Parameter pythonArray: Python numpy array (PythonObject)
-    /// - Returns: MLXArray
+    /// - Returns: MLXArray (Float32)
     public static func fromPython(_ pythonArray: PythonObject) -> MLXArray {
         // Get shape
         let shape = Array(pythonArray.shape)!.map { Int($0)! }
 
         // Flatten and convert to Swift array
         let flattened = pythonArray.flatten()
-        let data = Array<Double>(flattened)!
+        let data = Array<Float>(flattened)!
 
         // Create MLXArray with proper shape
-        return MLXArray(data, shape)
-    }
-
-    /// Convert Python numpy array to MLXArray (Double precision)
-    ///
-    /// - Parameter pythonArray: Python numpy array (PythonObject)
-    /// - Returns: MLXArray with Float64 dtype
-    public static func fromPythonDouble(_ pythonArray: PythonObject) -> MLXArray {
-        let shape = Array(pythonArray.shape)!.map { Int($0)! }
-        let flattened = pythonArray.flatten()
-        let data = Array<Double>(flattened)!
         return MLXArray(data, shape)
     }
 
@@ -70,24 +59,24 @@ public enum MLXConversion {
         // Get batch size from first array
         guard let firstArray = arrays.values.first else {
             // Return empty 2D array
-            return np.array([[Double]]())
+            return np.array([[Float]]())
         }
         let batchSize = firstArray.shape[0]
 
         // Stack features in correct order
-        var features: [[Double]] = []
+        var features: [[Float]] = []
         for fname in featureNames {
             guard let array = arrays[fname] else {
                 // Missing feature - this should have been caught by validation
                 continue
             }
             eval(array)
-            let values = array.asArray(Double.self)
+            let values = array.asArray(Float.self)
             features.append(values)
         }
 
         // Transpose: features is [num_features][batch_size], need [batch_size][num_features]
-        var transposed: [[Double]] = Array(repeating: Array(repeating: 0.0, count: featureNames.count), count: batchSize)
+        var transposed: [[Float]] = Array(repeating: Array(repeating: 0.0, count: featureNames.count), count: batchSize)
         for (featureIdx, featureValues) in features.enumerated() {
             for (batchIdx, value) in featureValues.enumerated() {
                 transposed[batchIdx][featureIdx] = value
@@ -98,7 +87,7 @@ public enum MLXConversion {
         return np.array(transposed)
     }
 
-    /// Batch convert multiple MLXArrays to Python numpy arrays (legacy dict format)
+    /// Batch convert multiple MLXArrays to Python numpy arrays (dict format)
     ///
     /// - Parameter arrays: Dictionary of MLXArrays
     /// - Returns: Dictionary of Python numpy arrays

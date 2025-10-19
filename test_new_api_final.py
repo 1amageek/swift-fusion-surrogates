@@ -32,7 +32,7 @@ def main():
             [5.0, 5.0, 1.0, 1.0, 2.0, 1.0, 0.3, 1.0, -3.0, 1.0],    # Sample 1
             [6.0, 6.0, 1.5, 1.5, 2.5, 1.2, 0.35, 1.0, -2.5, 1.0],   # Sample 2
             [7.0, 7.0, 2.0, 2.0, 3.0, 1.4, 0.4, 1.0, -2.0, 1.0],    # Sample 3
-        ], dtype=np.float64)
+        ], dtype=np.float32)
 
         print(f"   ✅ Input shape: {inputs.shape} (batch_size={batch_size}, num_features=10)")
         print(f"   ✅ Input sample[0]: {inputs[0]}")
