@@ -1,0 +1,25 @@
+{
+  "input_names": [
+    "Ati",
+    "Ate",
+    "Ane",
+    "Ani",
+    "q",
+    "smag",
+    "x",
+    "Ti_Te",
+    "LogNuStar",
+    "normni"
+  ],
+  "output_names": [
+    "efiITG",
+    "efeITG",
+    "pfeITG",
+    "efeTEM",
+    "efiTEM",
+    "pfeTEM",
+    "efeETG",
+    "gamma_max"
+  ],
+  "num_layers": 6
+}

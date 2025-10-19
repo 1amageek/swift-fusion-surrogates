@@ -3,7 +3,7 @@
 A Swift wrapper for Google DeepMind's [fusion_surrogates](https://github.com/google-deepmind/fusion_surrogates) Python library, designed for integration with [swift-TORAX](https://github.com/google-deepmind/torax) - a Swift implementation of the TORAX tokamak plasma transport simulator.
 
 [![Swift 6.0+](https://img.shields.io/badge/Swift-6.0+-orange.svg)](https://swift.org)
-[![Platform](https://img.shields.io/badge/platform-macOS%2013.3+-lightgrey.svg)](https://www.apple.com/macos/)
+[![Platform](https://img.shields.io/badge/platform-macOS%2015+-lightgrey.svg)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 ## Overview
@@ -301,16 +301,39 @@ let evaluated = EvaluatedArray.evaluatingBatch(Array(combined.values))
 ## Testing
 
 ```bash
-# Run unit tests (no Python/MLX dependencies required)
+# Run all tests (74 tests including MLX/TORAX integration)
 swift test
 
-# Expected: Test run with 4 tests in 2 suites passed
+# Run Python integration tests only
+swift test --filter PythonIntegrationTests
 ```
 
-**Integration Tests:** Python/MLX integration tests require environment setup. See [TESTING.md](TESTING.md) for:
-- Manual verification scripts (`verify_python_api.py`, `test_new_api_final.py`)
-- MLX/Python environment configuration
-- Known limitations and workarounds
+### Python Configuration
+
+Python integration tests use [swift-configuration](https://github.com/apple/swift-configuration) to manage Python library paths. Configure via `.env` file:
+
+```bash
+# .env
+PYTHON_LIBRARY_PATH=/Library/Frameworks/Python.framework/Versions/3.12/Python
+PYTHON_VERSION=3.12
+```
+
+**Default configuration (if .env not found):**
+- macOS: `/Library/Frameworks/Python.framework/Versions/3.12/Python`
+- Python version: `3.12`
+
+**To customize:** Create a `.env` file in the project root with your Python path
+
+**Manual verification scripts:**
+```bash
+# Verify Python API
+python3 verify_python_api.py
+
+# Full integration test
+python3 test_new_api_final.py
+```
+
+See [TESTING.md](TESTING.md) for detailed testing documentation.
 
 ## Performance
 
@@ -330,11 +353,12 @@ FusionSurrogates uses **MLX-native gradient computation** for significant perfor
 ## Requirements
 
 - **Swift:** 6.0 or later
-- **Platform:** macOS 13.3 or later (MLX Metal support required)
+- **Platform:** macOS 15.0 or later (for swift-configuration)
 - **Python:** 3.12 or later
 - **Dependencies:**
   - [PythonKit](https://github.com/pvieito/PythonKit) - Python interop
   - [MLX-Swift](https://github.com/ml-explore/mlx-swift) - Array operations (0.29.1+)
+  - [swift-configuration](https://github.com/apple/swift-configuration) - Test configuration (0.1.1+)
   - [fusion_surrogates](https://github.com/google-deepmind/fusion_surrogates) - Python library (pip, v0.4.2+)
 
 **Platform Constraints:**

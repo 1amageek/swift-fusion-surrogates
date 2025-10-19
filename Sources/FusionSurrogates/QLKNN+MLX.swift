@@ -1,72 +1,13 @@
 import Foundation
 import MLX
-import PythonKit
 
-// MARK: - QLKNN Extensions for MLX Integration
+// MARK: - QLKNN Model Interface
 
-extension QLKNN {
-
-    /// Predict transport fluxes using MLXArray inputs
-    ///
-    /// - Parameter inputs: Dictionary of input parameters as MLXArrays (1D arrays of length batch_size)
-    /// - Returns: Dictionary of output parameters as MLXArrays
-    /// - Throws: FusionSurrogatesError if prediction fails
-    public func predict(_ inputs: [String: MLXArray]) throws -> [String: MLXArray] {
-        // Validate inputs before prediction
-        try QLKNN.validateInputs(inputs)
-
-        // Validate shapes are consistent
-        try QLKNN.validateShapes(inputs)
-
-        // Convert MLXArrays to 2D numpy array (batch_size, 10)
-        let pythonInputArray = MLXConversion.batchToPythonArray(inputs)
-
-        // Call Python prediction (returns dict of JAX arrays)
-        let pythonOutputs = model.predict(pythonInputArray)
-
-        // Convert outputs back to MLXArrays
-        return MLXConversion.batchFromPython(pythonOutputs)
-    }
-
-    /// Predict transport fluxes with scalar inputs (will be broadcast to grid size)
-    ///
-    /// - Parameters:
-    ///   - inputs: Dictionary of scalar input parameters
-    ///   - nCells: Number of cells in the grid
-    /// - Returns: Dictionary of output arrays
-    /// - Throws: FusionSurrogatesError if prediction fails
-    public func predictScalar(
-        _ inputs: [String: Float],
-        nCells: Int
-    ) throws -> [String: MLXArray] {
-        // Convert scalars to MLXArrays
-        var mlxInputs: [String: MLXArray] = [:]
-        for (key, value) in inputs {
-            mlxInputs[key] = MLXArray.repeating(value, count: nCells)
-        }
-
-        return try predict(mlxInputs)
-    }
-
-    /// Predict transport fluxes with profile-based inputs
-    ///
-    /// This method takes spatially-varying profiles as input and returns
-    /// spatially-varying transport coefficients.
-    ///
-    /// - Parameter profiles: Dictionary of profile arrays
-    /// - Returns: Dictionary of transport coefficients
-    /// - Throws: FusionSurrogatesError if prediction fails
-    public func predictProfiles(_ profiles: [String: MLXArray]) throws -> [String: MLXArray] {
-        return try predict(profiles)
-    }
-}
-
-// MARK: - QLKNN Input Builders
-
-extension QLKNN {
+/// QLKNN neural network model for transport flux prediction
+public struct QLKNN {
 
     /// Input parameter names expected by QLKNN model
-    /// Order matters: must match model.config.input_names
+    /// Order matters: must match model input layer
     public static let inputParameterNames: [String] = [
         "Ati",        // R/L_Ti - Normalized ion temperature gradient
         "Ate",        // R/L_Te - Normalized electron temperature gradient
@@ -80,22 +21,22 @@ extension QLKNN {
         "normni"      // Normalized ion density (ni/ne)
     ]
 
-    /// Output parameter names returned by QLKNN model
+    /// Output parameter names returned by QLKNN model (ONNX order)
     public static let outputParameterNames: [String] = [
-        "efiITG",     // Ion thermal flux (ITG mode) [GB units]
-        "efeITG",     // Electron thermal flux (ITG mode)
-        "efeTEM",     // Electron thermal flux (TEM mode)
-        "efeETG",     // Electron thermal flux (ETG mode)
-        "efiTEM",     // Ion thermal flux (TEM mode)
+        "efeITG",     // Electron thermal flux (ITG mode) [GB units]
+        "efiITG",     // Ion thermal flux (ITG mode)
         "pfeITG",     // Particle flux (ITG mode)
+        "efeTEM",     // Electron thermal flux (TEM mode)
+        "efiTEM",     // Ion thermal flux (TEM mode)
         "pfeTEM",     // Particle flux (TEM mode)
+        "efeETG",     // Electron thermal flux (ETG mode)
         "gamma_max"   // Maximum growth rate
     ]
 
     /// Validate input dictionary has all required parameters
     ///
     /// - Parameter inputs: Dictionary to validate
-    /// - Throws: FusionSurrogatesError.missingInput if any required parameter is missing
+    /// - Throws: FusionSurrogatesError if any required parameter is missing
     public static func validateInputs(_ inputs: [String: MLXArray]) throws {
         for paramName in inputParameterNames {
             guard inputs[paramName] != nil else {
@@ -109,7 +50,7 @@ extension QLKNN {
     /// Validate input dictionary with Float values
     ///
     /// - Parameter inputs: Dictionary to validate
-    /// - Throws: FusionSurrogatesError.missingInput if any required parameter is missing
+    /// - Throws: FusionSurrogatesError if any required parameter is missing
     public static func validateInputs(_ inputs: [String: Float]) throws {
         for paramName in inputParameterNames {
             guard inputs[paramName] != nil else {
@@ -123,16 +64,13 @@ extension QLKNN {
     /// Validate that all input arrays have consistent shapes
     ///
     /// - Parameter inputs: Dictionary of input arrays
-    /// - Throws: FusionSurrogatesError.predictionFailed if shapes are inconsistent
+    /// - Throws: FusionSurrogatesError if shapes are inconsistent
     public static func validateShapes(_ inputs: [String: MLXArray]) throws {
-        print("🔍 [validateShapes] Starting validation")
-
         guard let firstArray = inputs.values.first else {
             throw FusionSurrogatesError.predictionFailed("No input arrays provided")
         }
 
         let expectedShape = firstArray.shape
-        print("🔍 [validateShapes] Expected shape: \(expectedShape)")
 
         // Check all arrays have 1D shape
         if expectedShape.count != 1 {
@@ -142,27 +80,18 @@ extension QLKNN {
         }
 
         let nCells = expectedShape[0]
-        print("🔍 [validateShapes] nCells: \(nCells)")
 
         // Check all arrays have the same shape
         for (key, array) in inputs {
-            print("🔍 [validateShapes] Checking '\(key)'...")
-
             if array.shape != expectedShape {
                 throw FusionSurrogatesError.predictionFailed(
                     "Shape mismatch for '\(key)': expected \(expectedShape), got \(array.shape)"
                 )
             }
-            print("  ✅ Shape OK")
 
             // Check for NaN or Inf values
-            print("  🔍 Calling eval()...")
             eval(array)
-            print("  ✅ eval() completed")
-
-            print("  🔍 Calling asArray()...")
             let values = array.asArray(Float.self)
-            print("  ✅ asArray() completed, got \(values.count) values")
 
             if values.contains(where: { $0.isNaN }) {
                 throw FusionSurrogatesError.predictionFailed(
@@ -174,7 +103,6 @@ extension QLKNN {
                     "Infinite values detected in input '\(key)'"
                 )
             }
-            print("  ✅ '\(key)' validation complete")
         }
 
         // Validate reasonable grid size
@@ -192,11 +120,27 @@ extension QLKNN {
     }
 }
 
+// MARK: - Error Types
+
+public enum FusionSurrogatesError: Error {
+    case predictionFailed(String)
+    case invalidInput(String)
+
+    public var localizedDescription: String {
+        switch self {
+        case .predictionFailed(let message):
+            return "Prediction failed: \(message)"
+        case .invalidInput(let message):
+            return "Invalid input: \(message)"
+        }
+    }
+}
+
 // MARK: - Helper Extensions
 
 extension MLXArray {
     /// Create array with repeated value
-    fileprivate static func repeating(_ value: Float, count: Int) -> MLXArray {
+    public static func repeating(_ value: Float, count: Int) -> MLXArray {
         return broadcast(MLXArray(value), to: [count])
     }
 }

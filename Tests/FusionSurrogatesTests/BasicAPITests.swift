@@ -37,13 +37,10 @@ struct BasicAPITests {
 
     @Test("FusionSurrogatesError descriptions")
     func errorDescriptions() {
-        let error1 = FusionSurrogatesError.pythonImportFailed("test_module")
-        #expect(error1.localizedDescription.contains("test_module"))
+        let error1 = FusionSurrogatesError.predictionFailed("test reason")
+        #expect(error1.localizedDescription.contains("test reason"))
 
-        let error2 = FusionSurrogatesError.unsupportedModelVersion("9_99")
-        #expect(error2.localizedDescription.contains("9_99"))
-
-        let error3 = FusionSurrogatesError.predictionFailed("test reason")
-        #expect(error3.localizedDescription.contains("test reason"))
+        let error2 = FusionSurrogatesError.invalidInput("invalid parameter")
+        #expect(error2.localizedDescription.contains("invalid parameter"))
     }
 }

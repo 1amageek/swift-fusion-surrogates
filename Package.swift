@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "FusionSurrogates",
     platforms: [
-        .macOS("13.3"),
+        .macOS(.v15),
         .iOS(.v16)
     ],
     products: [
@@ -17,7 +17,6 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/pvieito/PythonKit.git", branch: "master"),
         .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.29.1")
     ],
     targets: [
@@ -26,13 +25,19 @@ let package = Package(
         .target(
             name: "FusionSurrogates",
             dependencies: [
-                "PythonKit",
-                .product(name: "MLX", package: "mlx-swift")
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift")
+            ],
+            resources: [
+                .copy("Resources/qlknn_7_11_weights.safetensors"),
+                .copy("Resources/qlknn_7_11_metadata.json")
             ]
         ),
         .testTarget(
             name: "FusionSurrogatesTests",
-            dependencies: ["FusionSurrogates"]
+            dependencies: [
+                "FusionSurrogates"
+            ]
         ),
     ]
 )

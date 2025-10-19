@@ -37,6 +37,9 @@ env/
 *.swo
 *~
 
+# Environment configuration
+.env
+
 # Other
 .netrc
 *.log

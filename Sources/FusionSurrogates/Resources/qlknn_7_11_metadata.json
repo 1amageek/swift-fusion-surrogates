@@ -1,0 +1,80 @@
+{
+  "model_name": "qlknn_7_11",
+  "architecture": {
+    "layers": [
+      {
+        "type": "Linear",
+        "in": 10,
+        "out": 133,
+        "activation": "ReLU"
+      },
+      {
+        "type": "Linear",
+        "in": 133,
+        "out": 133,
+        "activation": "ReLU"
+      },
+      {
+        "type": "Linear",
+        "in": 133,
+        "out": 133,
+        "activation": "ReLU"
+      },
+      {
+        "type": "Linear",
+        "in": 133,
+        "out": 133,
+        "activation": "ReLU"
+      },
+      {
+        "type": "Linear",
+        "in": 133,
+        "out": 133,
+        "activation": "ReLU"
+      },
+      {
+        "type": "Linear",
+        "in": 133,
+        "out": 8,
+        "activation": null
+      }
+    ]
+  },
+  "input_names": [
+    "Ati",
+    "Ate",
+    "Ane",
+    "Ani",
+    "q",
+    "smag",
+    "x",
+    "Ti_Te",
+    "LogNuStar",
+    "normni"
+  ],
+  "output_names": [
+    "efiITG",
+    "efeITG",
+    "pfeITG",
+    "efeTEM",
+    "efiTEM",
+    "pfeTEM",
+    "efeETG",
+    "gamma_max"
+  ],
+  "weight_names": [
+    "_network.model.0.bias",
+    "_network.model.0.weight",
+    "_network.model.2.bias",
+    "_network.model.2.weight",
+    "_network.model.4.bias",
+    "_network.model.4.weight",
+    "_network.model.6.bias",
+    "_network.model.6.weight",
+    "_network.model.8.bias",
+    "_network.model.8.weight",
+    "_network.model.10.bias",
+    "_network.model.10.weight"
+  ],
+  "precision": "float32"
+}

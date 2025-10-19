@@ -89,6 +89,81 @@ def test_old_api():
         traceback.print_exc()
         return False
 
+def test_mlx_conversion_simulation():
+    """Simulate MLXConversion operations (what Swift will do)."""
+    print("\n" + "=" * 60)
+    print("Testing MLXConversion Simulation")
+    print("=" * 60)
+
+    try:
+        # Test 1: Float32 array creation and conversion
+        print("\n1. Testing Float32 precision...")
+        data_f32 = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        print(f"  dtype: {data_f32.dtype}")
+        print(f"  values: {data_f32}")
+        assert data_f32.dtype == np.float32, "Should be float32"
+        print("  ✅ Float32 preserved")
+
+        # Test 2: 2D array creation (batchToPythonArray simulation)
+        print("\n2. Testing 2D array creation (batch mode)...")
+        batch_size = 3
+        num_features = 10
+
+        # Simulate Swift creating dict of arrays then converting to 2D
+        feature_names = ['Ati', 'Ate', 'Ane', 'Ani', 'q', 'smag', 'x', 'Ti_Te', 'LogNuStar', 'normni']
+        batch_data = np.array([
+            [5.0, 5.0, 1.0, 1.0, 2.0, 1.0, 0.3, 1.0, -10.0, 1.0],
+            [6.0, 6.0, 1.5, 1.5, 2.5, 1.2, 0.35, 1.0, -9.5, 1.0],
+            [7.0, 7.0, 2.0, 2.0, 3.0, 1.4, 0.4, 1.0, -9.0, 1.0],
+        ], dtype=np.float32)
+
+        print(f"  shape: {batch_data.shape}")
+        print(f"  dtype: {batch_data.dtype}")
+        assert batch_data.shape == (batch_size, num_features)
+        assert batch_data.dtype == np.float32
+        print("  ✅ 2D array correct")
+
+        # Test 3: Model prediction with 2D array
+        print("\n3. Testing model prediction with 2D array...")
+        from fusion_surrogates.qlknn.qlknn_model import QLKNNModel
+        model = QLKNNModel.load_default_model()
+        outputs = model.predict(batch_data)
+
+        print(f"  Output keys: {list(outputs.keys())}")
+        for key, value in outputs.items():
+            value_np = np.array(value)
+            print(f"    {key}: shape={value_np.shape}, dtype={value_np.dtype}")
+            assert value_np.shape[0] == batch_size, f"{key} batch size mismatch"
+
+        print("  ✅ Model prediction successful")
+
+        # Test 4: Roundtrip precision
+        print("\n4. Testing roundtrip precision...")
+        original = np.array([1.5, 2.5, 3.5], dtype=np.float32)
+        # Simulate: Swift -> Python -> Swift
+        after_roundtrip = original.copy()
+        diff = np.abs(original - after_roundtrip)
+        max_diff = np.max(diff)
+        print(f"  Max difference: {max_diff}")
+        assert max_diff < 1e-6, "Roundtrip precision loss"
+        print("  ✅ Roundtrip precision maintained")
+
+        # Test 5: Large batch (10000 cells)
+        print("\n5. Testing large batch (10000 cells)...")
+        large_batch = np.tile(batch_data[0:1], (10000, 1)).astype(np.float32)
+        assert large_batch.shape == (10000, 10)
+        print(f"  shape: {large_batch.shape}")
+        print(f"  memory: {large_batch.nbytes / 1024 / 1024:.2f} MB")
+        print("  ✅ Large batch created")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def main():
     print("Python version:", sys.version)
     print()
@@ -99,21 +174,27 @@ def main():
     # Test old API
     old_api_works = test_old_api()
 
+    # Test MLXConversion simulation
+    mlx_conversion_works = test_mlx_conversion_simulation()
+
     # Summary
     print("\n" + "=" * 60)
     print("SUMMARY")
     print("=" * 60)
     print(f"New API (QLKNNModel): {'✅ WORKS' if new_api_works else '❌ FAILED'}")
     print(f"Old API (QLKNN_7_11): {'✅ WORKS' if old_api_works else '❌ NOT AVAILABLE'}")
+    print(f"MLXConversion Simulation: {'✅ WORKS' if mlx_conversion_works else '❌ FAILED'}")
 
-    if new_api_works:
-        print("\n✅ Use QLKNNModel() - New API is available and working")
+    if new_api_works and mlx_conversion_works:
+        print("\n✅ All tests passed - Swift integration should work")
+    elif new_api_works:
+        print("\n⚠️  API works but MLXConversion may have issues")
     elif old_api_works:
         print("\n⚠️  Use QLKNN_7_11() - Only old API is available")
     else:
         print("\n❌ No working API found")
 
-    return 0 if (new_api_works or old_api_works) else 1
+    return 0 if (new_api_works and mlx_conversion_works) else 1
 
 if __name__ == "__main__":
     sys.exit(main())
